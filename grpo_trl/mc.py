@@ -80,7 +80,21 @@ def train_mc(
     meter: Meter,
     after_update: Callable[[VerifiableRL], bool],
 ) -> VerifiableRL:
-    """Train the policy with TRL's trainer under ``settings`` (its own arguments)."""
+    """Train the policy with TRL's trainer under ``settings`` (its own arguments).
+
+    ``min_queries_frac``, if given, is the one setting that is not a TRL
+    argument: where the regime lets STOP be chosen after one slot (R2), the
+    incumbent may instead hold itself to ``round(frac * n_slots)`` slots, in
+    training and in deployment, which is how a TRL user would set
+    ``min_queries``/``predict_min_queries``. It applies in R2 only; in R1
+    ``min_queries`` is the library default for every arm.
+    """
+    settings = dict(settings)
+    frac = settings.pop("min_queries_frac", None)
+    if frac is not None and problem.regime.name == "R2":
+        floor = max(problem.regime.min_queries, round(frac * problem.n_slots))
+        floor = min(floor, problem.regime.max_steps)
+        settings.update(min_queries=floor, predict_min_queries=floor)
     model = problem.model(**{**settings, **FROZEN})
     meter.attach("policy", model.policy_)
     meter.attach("classifier", model.classifier_)

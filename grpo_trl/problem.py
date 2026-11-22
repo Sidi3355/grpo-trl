@@ -151,14 +151,14 @@ class Problem:
         TRL's deployment loop (``_reveal``) run on it unchanged.
         """
         names = list(self.slots)
-        model = VerifiableRL(
-            dict(self.slots),
+        settings = {
             **self.regime.trl_kwargs(names),
-            random_state=self.seed,
-            policy_hidden=self.policy_hidden,
-            clf_hidden=self.clf_hidden,
-            **optimiser_settings,
-        )
+            "random_state": self.seed,
+            "policy_hidden": self.policy_hidden,
+            "clf_hidden": self.clf_hidden,
+            **optimiser_settings,  # an arm may tighten min_queries for itself
+        }
+        model = VerifiableRL(dict(self.slots), **settings)
         model._layout(self.train.x.numpy(), fitting=True)  # slot_names_, columns_, costs_
         model._build_networks(np.random.default_rng(0))  # replaced just below
         model.policy_.load_state_dict(self.policy_state)

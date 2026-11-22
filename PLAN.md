@@ -323,4 +323,59 @@ E3 to E5 are run if compute allows, in that order; any that is dropped is record
 
 ## 13. Amendments
 
-*(none yet)*
+### A1 (2026-11-22, after the pilot on dev seeds, before tuning and before any confirmatory run)
+
+The test bed was built and run on dev seed 1000 only. Four things changed as a result. Each is recorded here
+with the evidence; the confirmatory hypotheses H1 to H4 are unchanged.
+
+**A1.1 R2's reward is made symmetric.** As first written, R2 paid `1/(2*pi1)` or `1/(2*pi0)` for a right call and
+0 for a wrong one. TRL's STOP target is `sigmoid(Q_stop / tau_stop)` with `Q_stop` the reward of stopping now, so
+with no negative rewards the target is at least 0.5 at every state and the incumbent stops at the first chance
+whatever it has seen (pilot: one slot revealed on every test sample, for every learning rate tried). That would
+have been a strawman. R2 now pays `+1/(2*pi_class)` for a right call and `-1/(2*pi_class)` for a wrong one. The
+expected terminal reward becomes Youden's J (`TPR + TNR - 1 = 2*BA - 1`), an affine map of the original; the Bayes
+call threshold is still the prevalence; total slot cost is `0.5 * (2*BA_all - 1)`, still half of what full
+information is worth. For policy-gradient arms nothing changes but the scale; for the incumbent a right call now
+gives a STOP target above 0.5 and a wrong one below.
+
+**A1.2 The incumbent may choose its own `min_queries` in R2.** Even with A1.1, TRL's STOP rule rarely continues
+past `min_queries` (its greedy rule compares P(STOP) with P(continue) *times* the best slot's share). A TRL user
+would respond by raising `min_queries`. So the incumbent's search space gains `min_queries_frac` in {0, 1/3, 1/2}:
+in R2 it may hold itself to `round(frac * S)` slots before STOP, in training and deployment. This only helps the
+incumbent. In R1 `min_queries` stays the library default for every arm.
+
+**A1.3 The mean-centred GRPO variant becomes a main arm, with its own hypotheses.** In the pilot canonical GRPO
+(z-scored advantage) collapsed on `synth-route` R2 to "reveal one slot, stop" (test return below the random
+policy), while the pre-registered ablation arm GRPO-nostd (group mean subtracted, no per-group std) learned the
+adaptive optimum (router, then the candidate it names, then STOP; two slots on every test sample). This is the
+direction H4 predicted, and larger than expected: per-group z-scoring gives a sample whose episodes differ only
+by a slot cost the same gradient weight as a sample whose episodes differ by a right or wrong call. One dev seed
+is not evidence, so:
+
+- `GRPO-nostd` is added to E1 as a fifth main arm and tuned with the same effort and the *same* random draws as
+  GRPO (only the advantage differs).
+- New confirmatory hypotheses, declared now, before tuning and before any confirmatory seed is run:
+  **H1'** GRPO-nostd beats PPO (as H1); **H2a'** GRPO-nostd beats the tuned incumbent in R2 (as H2a);
+  **H2b'** GRPO-nostd is non-inferior to the tuned incumbent in R1 (as H2b, margin 0.10).
+- The Holm family is now {H1, H2a, H2b, H3, H4, H1', H2a', H2b'}.
+- Decision rule (section 9) extended: if canonical GRPO fails but GRPO-nostd passes H2a' and H2b', the
+  recommendation is to offer the mean-centred variant, and to say plainly that canonical GRPO is not suitable.
+- H3 (per-sample vs batch grouping) is tested for both variants; the confirmatory test stays the canonical pair,
+  the mean-centred pair (GRPO-nostd vs a batch-mean baseline without std, i.e. `batch` vs `group_nostd` share the
+  scale rule) is reported beside it.
+
+**A1.4 Details the plan left open, fixed now.**
+
+- *GRPO-nostd's scale.* The centred returns are divided by one batch-wide standard deviation, so the step size
+  does not depend on the reward's units while the relative weight of samples is the true gradient's.
+- *KL term.* Computed exactly over the action distribution (there are at most eight actions), not by the
+  single-sample estimator the GRPO paper uses for a vocabulary.
+- *Length normalisation.* Critic-free arms weight each step by `1/|episode|` (GRPO's objective, equation 3 of
+  arXiv:2402.03300); critic arms average over transitions (PPO's usual objective).
+- *Frozen classifier settings.* `VerifiableRL._pretrain`'s three settings are chosen per dataset by a mechanical
+  rule on dev seeds 1000 and 1001 (lowest validation log loss under random reveals over a 3 x 3 grid; ties within
+  0.005 go to the fewest gradient steps): `experiments/select_classifier.py`, results in
+  `experiments/classifier_selection/`.
+- *Tabular slots carry a constant 1,* so that a revealed slot is never the zero vector TRL uses for "not
+  revealed".
+- *Stopping on the budget.* Training stops before the update that would exceed the budget, so no arm overspends.

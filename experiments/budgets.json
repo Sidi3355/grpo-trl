@@ -1,0 +1,86 @@
+{
+ "synth-route": {
+  "R1": {
+   "compute": 412871650880.0,
+   "transitions": 1791636.5,
+   "episodes": 506270.0,
+   "wall": 34.611754059791565
+  },
+  "R2": {
+   "compute": 194505534912.0,
+   "transitions": 685845.5,
+   "episodes": 253250.0,
+   "wall": 18.782716393470764
+  }
+ },
+ "founders": {
+  "R1": {
+   "compute": 2270436966848.0,
+   "transitions": 1509093.5,
+   "episodes": 446850.0,
+   "wall": 91.36624121665955
+  },
+  "R2": {
+   "compute": 1129085834496.0,
+   "transitions": 619187.5,
+   "episodes": 228120.0,
+   "wall": 49.140379428863525
+  }
+ },
+ "kickstarter": {
+  "R1": {
+   "compute": 1501566659712.0,
+   "transitions": 1740301.5,
+   "episodes": 505880.0,
+   "wall": 69.96595823764801
+  },
+  "R2": {
+   "compute": 733793930304.0,
+   "transitions": 692405.0,
+   "episodes": 253550.0,
+   "wall": 36.58850693702698
+  }
+ },
+ "fakejobs": {
+  "R1": {
+   "compute": 975241399104.0,
+   "transitions": 1435663.5,
+   "episodes": 420425.0,
+   "wall": 53.37659502029419
+  },
+  "R2": {
+   "compute": 491567782720.0,
+   "transitions": 568356.5,
+   "episodes": 211225.0,
+   "wall": 29.977370262145996
+  }
+ },
+ "credit": {
+  "R1": {
+   "compute": 431965575104.0,
+   "transitions": 1981851.0,
+   "episodes": 579465.0,
+   "wall": 33.076515197753906
+  },
+  "R2": {
+   "compute": 207129019456.0,
+   "transitions": 796555.0,
+   "episodes": 294635.0,
+   "wall": 18.107770562171936
+  }
+ },
+ "adult": {
+  "R1": {
+   "compute": 363180745152.0,
+   "transitions": 1496861.0,
+   "episodes": 436525.0,
+   "wall": 31.15128242969513
+  },
+  "R2": {
+   "compute": 174460545920.0,
+   "transitions": 554557.5,
+   "episodes": 209950.0,
+   "wall": 17.13207983970642
+  }
+ }
+}

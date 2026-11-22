@@ -32,21 +32,36 @@ from .problem import (
     returns_of_masks,
 )
 
-# The frozen classifier: TRL's random-reveal curriculum (``VerifiableRL._pretrain``)
-# with settings chosen on dev seeds for validation log loss (see docs/ENVIRONMENT.md).
-PRETRAIN = {"pretrain_epochs": 30, "pretrain_lr": 1e-3, "pretrain_batch": 64}
+SELECTION = ROOT / "experiments" / "classifier_selection"
+
+
+def classifier_settings(dataset: str) -> dict[str, Any]:
+    """The frozen classifier's ``_pretrain`` settings, chosen on dev seeds.
+
+    Written by ``experiments/select_classifier.py`` (its rule is in that file).
+    """
+    chosen = json.loads((SELECTION / f"{dataset}.json").read_text())["chosen"]
+    return {k: chosen[k] for k in ("pretrain_epochs", "pretrain_lr", "pretrain_batch")}
+
+
 N_CHECKPOINTS = 10
 
 
-def build_problem(dataset: str, seed: int, regime: str, pretrain: dict[str, Any] | None = None) -> Problem:
-    """The problem for (dataset, seed, regime); the classifier is cached on disk."""
+def build_problem(
+    dataset: str, seed: int, regime: str, pretrain: dict[str, Any] | None = None
+) -> Problem:
+    """The problem for (dataset, seed, regime); the classifier is cached on disk.
+
+    The classifier is trained by TRL's random-reveal curriculum
+    (``VerifiableRL._pretrain``), as ``VerifiableRL._train`` does, then frozen.
+    """
     pool = load_pool(dataset)
     (xtr, ytr), (xva, yva), (xte, yte) = split_pool(pool, seed)
     train, val, test = (
         Split(torch.from_numpy(x), torch.from_numpy(y))
         for x, y in ((xtr, ytr), (xva, yva), (xte, yte))
     )
-    settings = pretrain or PRETRAIN
+    settings = pretrain or classifier_settings(dataset)
     tag = "_".join(f"{v:g}" for v in settings.values())
     cached = CACHE / "problems" / f"{dataset}_s{seed}_{tag}.pt"
     n_slots = len(pool.slots)

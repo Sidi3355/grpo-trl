@@ -1,0 +1,75 @@
+{
+ "dataset": "founders",
+ "chosen": {
+  "pretrain_lr": 0.001,
+  "pretrain_epochs": 10,
+  "pretrain_batch": 64,
+  "val_log_loss": 0.4774190475412994,
+  "val_minus_train": 0.01004035384133406
+ },
+ "grid": [
+  {
+   "pretrain_lr": 0.0001,
+   "pretrain_epochs": 10,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.6179720756798495,
+   "val_minus_train": -0.011735241976224442
+  },
+  {
+   "pretrain_lr": 0.0001,
+   "pretrain_epochs": 30,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.4959088378584552,
+   "val_minus_train": 0.003911544058439298
+  },
+  {
+   "pretrain_lr": 0.0001,
+   "pretrain_epochs": 60,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.4827811113417413,
+   "val_minus_train": 0.03605919218302964
+  },
+  {
+   "pretrain_lr": 0.0003,
+   "pretrain_epochs": 10,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.5498859910682763,
+   "val_minus_train": -0.006998682228177011
+  },
+  {
+   "pretrain_lr": 0.0003,
+   "pretrain_epochs": 30,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.480448905579111,
+   "val_minus_train": 0.029268706264402644
+  },
+  {
+   "pretrain_lr": 0.0003,
+   "pretrain_epochs": 60,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.49452970431848464,
+   "val_minus_train": 0.06451120562731327
+  },
+  {
+   "pretrain_lr": 0.001,
+   "pretrain_epochs": 10,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.4774190475412994,
+   "val_minus_train": 0.01004035384133406
+  },
+  {
+   "pretrain_lr": 0.001,
+   "pretrain_epochs": 30,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.48086261033829136,
+   "val_minus_train": 0.03499691974338856
+  },
+  {
+   "pretrain_lr": 0.001,
+   "pretrain_epochs": 60,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.4854985540317073,
+   "val_minus_train": 0.06742092047513942
+  }
+ ]
+}
