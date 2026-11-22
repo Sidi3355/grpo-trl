@@ -1,0 +1,75 @@
+{
+ "dataset": "synth-route",
+ "chosen": {
+  "pretrain_lr": 0.001,
+  "pretrain_epochs": 30,
+  "pretrain_batch": 64,
+  "val_log_loss": 0.4484913115201358,
+  "val_minus_train": 0.12253074385866194
+ },
+ "grid": [
+  {
+   "pretrain_lr": 0.0001,
+   "pretrain_epochs": 10,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.5074056045850044,
+   "val_minus_train": 0.025906675030893472
+  },
+  {
+   "pretrain_lr": 0.0001,
+   "pretrain_epochs": 30,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.47672297232228916,
+   "val_minus_train": 0.04709695870260466
+  },
+  {
+   "pretrain_lr": 0.0001,
+   "pretrain_epochs": 60,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.4574523760895691,
+   "val_minus_train": 0.09250580172480072
+  },
+  {
+   "pretrain_lr": 0.0003,
+   "pretrain_epochs": 10,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.484282815364409,
+   "val_minus_train": 0.04319008471044272
+  },
+  {
+   "pretrain_lr": 0.0003,
+   "pretrain_epochs": 30,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.4534287953143731,
+   "val_minus_train": 0.10601679278085996
+  },
+  {
+   "pretrain_lr": 0.0003,
+   "pretrain_epochs": 60,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.45188322238312584,
+   "val_minus_train": 0.13858053410205248
+  },
+  {
+   "pretrain_lr": 0.001,
+   "pretrain_epochs": 10,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.46376458910566537,
+   "val_minus_train": 0.07456671540431542
+  },
+  {
+   "pretrain_lr": 0.001,
+   "pretrain_epochs": 30,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.4484913115201358,
+   "val_minus_train": 0.12253074385866194
+  },
+  {
+   "pretrain_lr": 0.001,
+   "pretrain_epochs": 60,
+   "pretrain_batch": 64,
+   "val_log_loss": 0.47329466238447526,
+   "val_minus_train": 0.17067175514816268
+  }
+ ]
+}
