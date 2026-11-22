@@ -1,0 +1,5 @@
+arm,normalised return,below random,slots,runs
+TRL shipped (tuned),"0.87 [0.58, 1.18]",0.25,2.7114791671435037,12
+PPO,"1.42 [1.24, 1.60]",0.0,2.900729159514109,12
+GRPO (mean-centred),"0.95 [0.63, 1.23]",0.08333333333333333,2.5367499689261117,12
+"GRPO (mean-centred, reward-scale normaliser)","1.12 [0.91, 1.29]",0.08333333333333333,2.4962083200613656,12

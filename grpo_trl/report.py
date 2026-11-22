@@ -409,6 +409,87 @@ def main() -> None:
             analysis.save_table(e4_pairs, "e4_pairwise")
             out += ["### Pairwise at four times the budget (descriptive)", "", _md(e4_pairs), ""]
 
+    if _exists("e7x4") and _exists("e7x1") and "e1" in frames and "e4" in frames:
+        arms7 = ["mc_tuned", "ppo", "grpo_nostd", "grpo_rawscale"]
+        labels7 = {**ARM_LABELS, "grpo_rawscale": "GRPO (mean-centred, reward-scale normaliser)"}
+        out += [
+            "## E7 (post hoc, Amendment A4). A normaliser that does not shrink as the policy converges",
+            "",
+        ]
+        for name, extra, base in (
+            ("four times the budget", "e7x4", "e4"),
+            ("one times the budget", "e7x1", "e1"),
+        ):
+            fresh = load_runs(extra)
+            keys = set(zip(fresh["condition"], fresh["seed"], strict=True))
+            old_runs = load_runs(base)
+            same = [k in keys for k in zip(old_runs["condition"], old_runs["seed"], strict=True)]
+            both = add_normalised(pd.concat([old_runs[same], fresh], ignore_index=True))
+            analysis.save_table(both[both["arm"] == "grpo_rawscale"], f"{extra}_runs")
+            rows = []
+            for arm in arms7:
+                mine = both[both["arm"] == arm]
+                by_condition = {str(c): g["norm"].to_numpy() for c, g in mine.groupby("condition")}
+                low, high = stats.stratified_bootstrap(by_condition)
+                rows.append(
+                    {
+                        "arm": labels7[arm],
+                        "normalised return": f"{np.mean([v.mean() for v in by_condition.values()]):.2f} [{low:.2f}, {high:.2f}]",
+                        "below random": float((mine["norm"] < 0).mean()),
+                        "slots": float(mine["test_n_slots"].mean()),
+                        "runs": len(mine),
+                    }
+                )
+            table7 = pd.DataFrame(rows)
+            analysis.save_table(table7, f"{extra}_summary")
+            pairs7 = []
+            for a, b in (
+                ("grpo_rawscale", "grpo_nostd"),
+                ("grpo_rawscale", "ppo"),
+                ("grpo_rawscale", "mc_tuned"),
+            ):
+                result = analysis.compare(both, a, b)
+                pairs7.append(
+                    {
+                        "comparison": f"{labels7[a]} - {labels7[b]}",
+                        "difference": analysis.fmt_ci(
+                            result["diff"], result["ci_low"], result["ci_high"]
+                        ),
+                        "p": result["p"],
+                        "conditions won/tied/lost": f"{result['wins']}/{result['ties']}/{result['losses']}",
+                    }
+                )
+            out += [
+                f"### At {name} ({both['condition'].nunique()} conditions x {both['seed'].nunique()} seeds)",
+                "",
+                _md(table7),
+                "",
+                _md(pd.DataFrame(pairs7)),
+                "",
+            ]
+            if extra == "e7x4":
+                drops = []
+                for exp, arm in (("e4", "ppo"), ("e4", "grpo_nostd"), ("e7x4", "grpo_rawscale")):
+                    curves = load_curves(exp)
+                    curves = curves[(curves["arm"] == arm) & (curves["fraction"] > 0)]
+                    anchors = anchor_table(both).set_index("condition")
+                    curves = curves.assign(
+                        norm=(curves["test_ret"] - curves["condition"].map(anchors["random"]))
+                        / curves["condition"].map(anchors["gap"])
+                    )
+                    per_run = curves.groupby(["condition", "seed"])["norm"].agg(
+                        best="max", last="last"
+                    )
+                    drops.append(
+                        {
+                            "arm": labels7[arm],
+                            "mean best checkpoint": per_run["best"].mean(),
+                            "mean last checkpoint": per_run["last"].mean(),
+                            "runs ending more than 0.3 below their best": f"{int((per_run['best'] - per_run['last'] > 0.3).sum())}/{len(per_run)}",
+                        }
+                    )
+                out += ["Best against last checkpoint, per run:", "", _md(pd.DataFrame(drops)), ""]
+
     if _exists("e5"):
         e5 = load_runs_e5()
         analysis.save_table(e5.drop(columns=["anchors", "settings"]), "e5_runs")

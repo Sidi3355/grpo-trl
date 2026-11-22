@@ -118,6 +118,10 @@ python experiments/launch.py e4         # four times the budget
 python experiments/e6_gradient_bias.py  # gradient-direction diagnostic (no training)
 ```
 
+```bash
+python experiments/launch.py e7         # post hoc: the reward-scale normaliser (Amendment A4)
+```
+
 E5 runs in an environment with the *patched* library (see `contrib/trl/README.md`):
 
 ```bash
@@ -139,8 +143,9 @@ is read off those files.
 |---|---|---|
 | tune + tune2 | 488 | about 90 minutes |
 | e1 (10 seeds) | 600 | about 80 minutes |
-| e2 | 360 | about 45 minutes |
-| e3 | 200 | about 25 minutes |
-| e4 | 60 | about 40 minutes |
-| e5 | 60 | about 30 minutes |
+| e2 | 320 | about 43 minutes |
+| e3 | 200 | about 27 minutes |
+| e4 | 60 | about 42 minutes |
+| e5 | 80 | about 70 minutes |
 | e6 | 36 | about 5 minutes |
+| e7 | 48 | about 12 minutes |

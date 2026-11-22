@@ -40,11 +40,17 @@ deployment code; equal compute counted on every network; equal tuning effort):
   test return (clearly ahead on one dataset, level on the other), raises F0.5 in 16 of 20, and takes a third to
   a half of the time.
 
-Two things the study found that are worth saying plainly:
+Three things the study found that are worth saying plainly:
 
-- **PPO did slightly better** (+0.09, not significant after correction for multiple tests). This PR proposes the
-  critic-free method because it is the smaller change. If you would rather have PPO, the study's implementation
-  ports directly.
+- **This optimiser is not stable over a long run.** Given four times the budget above (classifier frozen), it
+  reached its best policy and then got worse in 8 of 12 runs, finishing at 0.95 against PPO's 1.42. One suspected
+  cause was tested and explains only part of it. One pass at these defaults is about 31 policy updates; the
+  collapses appeared after roughly 33 to 47. I would not merge this as it stands without either a stopping rule
+  or agreement that PPO is the better route; I am opening it to show a concrete, tested implementation and to ask
+  which you would prefer.
+- **PPO did better**: +0.09 at the budget above (not significant after correction for multiple tests) and +0.47
+  at four times it. This PR proposes the critic-free method because it is the smaller change. If you would rather
+  have PPO, the study's implementation ports directly.
 - **GRPO as published should not be offered here.** Dividing by each group's standard deviation gives a sample
   whose episodes differ only by a slot cost the same weight as one whose episodes differ by a right or wrong
   call; its update is close to orthogonal to the policy gradient (mean cosine 0.24 against 0.99 without the

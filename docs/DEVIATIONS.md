@@ -15,6 +15,8 @@ confirmatory runs are in `PLAN.md` section 13; this file lists them in one place
 | 8 | Before confirmatory runs (A2.5) | E3 with 5 seeds, E4 with 3; Dr. GRPO arm added to E2; E6 added as exploratory | Compute; explanation of H4 | No |
 | 9 | After confirmatory runs (A3) | E1 not extended to 20 seeds | Compute went to E3, E5 and E4; decided on time alone, as A2.4 required | No |
 | 10 | Before E5 was run (A3) | E5 gained an arm: the patch's own defaults | To check the out-of-the-box behaviour of the proposed change | No |
+| 11 | During E4 (A4) | E7 added: a post hoc arm with a reward-scale normaliser | The first seed of E4 showed mean-centred GRPO collapsing late in training | Registered before the rest of E4 was read; exploratory; it did not cure the collapse |
+| 12 | After E4 and E7 | The recommendation departs from the pre-registered decision rule: PPO, not mean-centred GRPO | The rule looked at one budget; at four the variant it selects is unstable | Against the study's own starting hypothesis |
 
 ## Things that did not go as the plan expected
 
@@ -30,3 +32,5 @@ These are results, not deviations, but a reader checking the plan against the re
 - **The plan's power target was unreachable** (deviation 7).
 - **Tuning made TRL's optimiser worse in R1** (0.72 as shipped, 0.61 tuned), because three of the four dev
   conditions were R2. The report compares against the better TRL arm in each regime as well.
+- **Mean-centred GRPO did not hold its gains over a long run** (E4), and the fix suggested by a diagnosis of
+  the collapse only partly worked (E7).

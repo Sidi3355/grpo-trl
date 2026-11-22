@@ -1,12 +1,17 @@
 # Proposed change to Think-Reason-Learn: `VerifiableRL(optimizer="group")`
 
-A TRL-native implementation of the optimiser this study recommends, written to TRL's contribution rules
-(`CONTRIBUTING.md`): plain constructor parameters stored unchanged, default behaviour untouched, tests beside the
-existing ones, a changelog entry.
+A TRL-native implementation of the critic-free optimiser this study tested end to end, written to TRL's
+contribution rules (`CONTRIBUTING.md`): plain constructor parameters stored unchanged, default behaviour
+untouched, tests beside the existing ones, a changelog entry.
+
+> **Status: a starting point for discussion, not a change to merge as is.** The study's recommendation is PPO
+> (see [`REPORT.md`](../../REPORT.md), section 7). This patch implements the critic-free variant, which is the
+> smaller change and did well at the study's standard budget and in the end-to-end check, but which collapsed
+> late in training when given four times that budget in 8 of 12 runs. Read "Known limitation" below first.
 
 | File | What |
 |---|---|
-| [`verifiable-rl-group-optimizer.patch`](verifiable-rl-group-optimizer.patch) | The whole change, against `Vela-Research/think-reason-learn` at `a712645` (v0.4.4): 5 files, 433 added lines, 4 changed |
+| [`verifiable-rl-group-optimizer.patch`](verifiable-rl-group-optimizer.patch) | The whole change, against `Vela-Research/think-reason-learn` at `a712645` (v0.4.4): 5 files, 437 added lines, 4 changed |
 | [`_group.py`](_group.py) | The new module, for reading without applying the patch |
 | [`PR_DESCRIPTION.md`](PR_DESCRIPTION.md) | The pull-request text, in TRL's template |
 
@@ -87,12 +92,28 @@ compute, this optimiser scores 1.01 on a scale where 0 is a random policy and 1 
 against 0.60 for the rollout optimiser tuned with the same effort and 0.49 as shipped. PPO, which needs a critic
 network, scores 1.10. Canonical GRPO, which divides by the group's standard deviation, scores 0.60 and should not
 be offered. Section 4.7 of the report runs this patch end to end, through `VerifiableRL.fit`, with the classifier
-co-trained.
+co-trained; sections 4.6 and 4.8 are the four-times-budget result and its follow-up.
 
-## What a maintainer might reasonably want changed
+## Known limitation
 
-- **PPO instead, or as well.** It scored 0.09 higher in the study (not significant after correction). The
-  study's implementation is `grpo_trl/pg.py`; porting it means one more network and three more settings.
+Trained for much longer than the study's standard budget (about 12 policy updates at these defaults), the
+optimiser reaches its best policy and then gets worse: at four times the budget, with the classifier frozen, 8
+of 12 runs ended more than 0.3 normalised units below their own best checkpoint, and it finished behind PPO
+(0.95 against 1.42) and level with the tuned rollout optimiser (0.87). One pass over 2,000 samples at these
+defaults is about 31 updates, so the default sits closer to that region than is comfortable. In the end-to-end
+check, where the classifier is co-trained, one pass did well on both datasets tried.
+
+One suspected cause was tested after the fact: the batch-wide normaliser of the advantages shrinks as the policy
+converges, so the step never does. Dividing by the batch standard deviation of the returns instead cost nothing
+at the standard budget and helped a little at four times it (1.12), without curing the collapse (6 of 12 runs).
+That variant is `advantage="group_rawscale"` in the study's `grpo_trl/pg.py`; this patch keeps the variant the
+end-to-end check ran. An entropy bonus, a lower learning rate or a validation-based stopping rule were not
+tried.
+
+## What a maintainer might reasonably want instead
+
+- **PPO.** Best at both budgets and stable. The study's implementation is `grpo_trl/pg.py` (`advantage="gae"`);
+  porting it means one more network (a critic the size of the classifier), GAE, and three more settings.
 - **A smaller default `group_size`.** Group sizes from 2 to 32 score the same within noise (report section 4.5);
   a smaller group makes a pass over the samples cheaper.
 - **The name.** `"group"` describes what it does; `"grpo"` would be more searchable but is not accurate, since the

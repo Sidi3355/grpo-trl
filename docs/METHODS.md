@@ -115,6 +115,12 @@ grouping of de Oliveira et al., 2025, where groups mix unrelated episodes); per-
 std (GRPO); leave-one-out mean; Dr. GRPO (per-sample mean, no length normalisation); a learned critic on the same
 data (PPO-G); a privileged critic that also sees every feature and the label (PPO-priv).
 
+### 3.5 The post hoc arm (E7)
+
+`group_rawscale`: mean-centred GRPO with the centred returns divided by the batch standard deviation of the
+returns themselves instead of the centred returns. Added after the first seed of E4 was read (Amendment A4),
+with mean-centred GRPO's frozen settings and no re-tuning.
+
 ## 4. Budget and compute accounting [`grpo_trl/meter.py`]
 
 Every arm gets the same compute budget and stops before the update that would exceed it.

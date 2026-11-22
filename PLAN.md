@@ -474,3 +474,9 @@ same seeds.
 **How it will be reported.** As a diagnosis and a candidate fix found after the confirmatory runs, on three
 seeds. If it removes the drop without losing ground at one times the budget, the proposed patch will use it and
 say so; the confirmatory results about mean-centred GRPO stay as they are.
+
+**Outcome of A4 (added after E7).** At one budget the change made no difference (+0.02 [-0.09, +0.14]). At four
+budgets it helped a little (0.95 to 1.12, +0.16 [-0.06, +0.43]) and did not cure the collapse: 6 of 12 runs still
+ended more than 0.3 below their best, against 8 of 12 without it and 2 of 12 for PPO. The hypothesis explains at
+most part of the instability. The proposed patch was therefore left as the variant the end-to-end experiment ran,
+with the limitation written into its documentation, and the report's recommendation was changed to PPO.

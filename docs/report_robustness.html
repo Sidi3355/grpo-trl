@@ -15,4 +15,19 @@
 <h3>Group size</h3>
 <p>Mean-centred GRPO scores between 1.11 and 1.25 for every group size from 2 to 32: two episodes per sample already give a usable baseline. Canonical GRPO is poor at every size and worst at two, where a z-score can only be +1 or &minus;1.</p>
 
-{{E4_BLOCK}}
+<h3>Four times the budget</h3>
+<p>Is TRL's optimiser just under-trained after one pass, and do the new arms hold what they gain? Four conditions, three seeds, each arm against its own result at the standard budget.</p>
+<div class="figure"><div class="scroll"><table>
+  <thead><tr><th>Optimiser</th><th class="num">Standard budget</th><th class="num">Four times it</th><th class="num">Runs ending well below their best</th></tr></thead>
+  <tbody>
+    <tr><td>PPO</td><td class="num">1.20</td><td class="num">1.42</td><td class="num">2 of 12</td></tr>
+    <tr><td>GRPO (mean-centred)</td><td class="num">1.35</td><td class="num">0.95</td><td class="num">8 of 12</td></tr>
+    <tr><td>TRL shipped (tuned)</td><td class="num">0.55</td><td class="num">0.87</td><td class="num">3 of 12</td></tr>
+    <tr><td>GRPO (canonical)</td><td class="num">0.68</td><td class="num">0.75</td><td class="num">2 of 12</td></tr>
+    <tr><td>TRL shipped (defaults)</td><td class="num">0.36</td><td class="num">0.37</td><td class="num">4 of 12</td></tr>
+  </tbody>
+</table></div>
+<div class="cap">Normalised test return, pooled over four conditions and three seeds. "Well below" is more than 0.3 under the run's own best checkpoint.</div></div>
+<p><strong>TRL's default optimiser is not under-trained:</strong> four times the budget changes nothing. <strong>PPO keeps improving.</strong> <strong>Mean-centred GRPO does not hold its gains:</strong> part-way through it is level with PPO, and then it drops sharply, usually between two checkpoints, with no sign of over-fitting.</p>
+<p>A diagnosis was registered before the rest of that experiment was read: the batch-wide scale the advantages are divided by shrinks as the policy converges, so the step never does. A one-line change to a scale that does not shrink cost nothing at the standard budget and helped a little at four times it (0.95 to 1.12), but 6 of 12 runs still collapsed. The diagnosis is at most part of the story.</p>
+

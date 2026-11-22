@@ -1,8 +1,8 @@
 diff --git a/docs/source/changelog.rst b/docs/source/changelog.rst
-index 6b147f7..b4cbdd5 100644
+index 6b147f7..23f7f43 100644
 --- a/docs/source/changelog.rst
 +++ b/docs/source/changelog.rst
-@@ -1,6 +1,19 @@
+@@ -1,6 +1,20 @@
  Changelog
  =========
  
@@ -17,7 +17,8 @@ index 6b147f7..b4cbdd5 100644
 +  includes the slot costs and the step penalty, so the policy learns *when to stop* from what continuing is worth.
 +  It needs no rollouts: a pass over the samples costs a fraction of a rollout pass. ``optimizer="rollout"``, the
 +  paper's method, stays the default, and nothing changes for existing code. New ``group_size``, ``group_batch``,
-+  ``group_epochs``, ``group_lr`` and ``clip_range``; the supervisor then advises only when predicting.
++  ``group_epochs``, ``group_lr`` and ``clip_range``; the supervisor then advises only when predicting. It is tuned
++  for short training: over many more updates than about a dozen it can get worse after reaching its best policy.
 +
  0.4.4 (2026-11-20)
  ------------------
@@ -382,7 +383,7 @@ index 53a003a..c33fee7 100644
      """The logit of the positive class from a partly observed state."""
  
 diff --git a/think_reason_learn/verifiable_rl/_verifiable_rl.py b/think_reason_learn/verifiable_rl/_verifiable_rl.py
-index 4d0b14e..b7fc839 100644
+index 4d0b14e..1cac8dd 100644
 --- a/think_reason_learn/verifiable_rl/_verifiable_rl.py
 +++ b/think_reason_learn/verifiable_rl/_verifiable_rl.py
 @@ -8,6 +8,8 @@ Each sample's features come in named slots (e.g. education, jobs). A policy
@@ -402,7 +403,7 @@ index 4d0b14e..b7fc839 100644
  from ._networks import Classifier, PolicyNet
  from ._supervisor import Supervisor
  from ._torch import (
-@@ -82,6 +85,21 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
+@@ -82,6 +85,24 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
          step_penalty, repeat_penalty: Added per step and per repeated query.
          reward_threshold: Classifier probability counted as a positive call.
          tau_info, tau_stop: Temperatures of the policy targets.
@@ -415,7 +416,10 @@ index 4d0b14e..b7fc839 100644
 +            learns when to stop from the slot costs and the step penalty, which
 +            the rollout targets do not. The supervisor then advises only when
 +            predicting. Its defaults were tuned with ``policy_batch=256`` and
-+            ``grad_clip=0.5``; set both to get the most from it.
++            ``grad_clip=0.5``; set both to get the most from it. It was tuned
++            for about a dozen updates: over several times as many it has been
++            seen to reach its best policy and then get worse, so prefer few
++            passes, or keep the best policy on held-out samples.
 +        group_size: Episodes played per sample by ``optimizer="group"``.
 +        group_batch: Episodes between its policy updates.
 +        group_epochs: Passes over those episodes per update.
@@ -424,7 +428,7 @@ index 4d0b14e..b7fc839 100644
          n_iterations: Passes over the training samples.
          update_every: Samples between network updates.
          policy_lr, clf_lr: Learning rates. The defaults (0.2's) suit thousands of
-@@ -131,6 +149,12 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
+@@ -131,6 +152,12 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
          reward_threshold: float = 0.3,
          tau_info: float = 1.0,
          tau_stop: float = 4.0,
@@ -437,7 +441,7 @@ index 4d0b14e..b7fc839 100644
          n_iterations: int = 1,
          update_every: int = 25,
          policy_lr: float = 5e-5,
-@@ -176,6 +200,12 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
+@@ -176,6 +203,12 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
          self.reward_threshold = reward_threshold
          self.tau_info = tau_info
          self.tau_stop = tau_stop
@@ -450,7 +454,7 @@ index 4d0b14e..b7fc839 100644
          self.n_iterations = n_iterations
          self.update_every = update_every
          self.policy_lr = policy_lr
-@@ -223,6 +253,10 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
+@@ -223,6 +256,10 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
              slot_texts: Text of each slot per sample, for the supervisor.
          """
          forget_fitted(self)
@@ -461,7 +465,7 @@ index 4d0b14e..b7fc839 100644
          try:
              features = self._layout(X, fitting=True)
              classes, codes = encode_labels(y)
-@@ -491,18 +525,77 @@ class _Trainer:
+@@ -491,18 +528,77 @@ class _Trainer:
          model = self.model
          self.shuffle.manual_seed(int(self.rng.integers(2**31)))
          target = self._frozen_copy() if model.clf_target_update_every else None

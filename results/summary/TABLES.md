@@ -385,33 +385,73 @@ Difference in (return - random) / (clairvoyant bound - random); no condition dro
 
 ## E4. Four times the budget: normalised test return, mean [95% CI]
 
-| condition      | TRL shipped (defaults)   | TRL shipped (tuned)   | PPO               | GRPO (canonical)     | GRPO (mean-centred)   |
-|:---------------|:-------------------------|:----------------------|:------------------|:---------------------|:----------------------|
-| synth-route/R1 | 1.44 [1.44, 1.44]        | -0.04 [-0.04, -0.04]  | 1.52 [1.52, 1.52] | 1.55 [1.55, 1.55]    | 0.19 [0.19, 0.19]     |
-| founders/R1    | 0.88 [0.88, 0.88]        | 0.72 [0.72, 0.72]     | 1.00 [1.00, 1.00] | 1.02 [1.02, 1.02]    | 0.62 [0.62, 0.62]     |
-| synth-route/R2 | 0.16 [0.16, 0.16]        | 1.99 [1.99, 1.99]     | 2.40 [2.40, 2.40] | -0.52 [-0.52, -0.52] | 1.32 [1.32, 1.32]     |
-| founders/R2    | -0.86 [-0.86, -0.86]     | 0.32 [0.32, 0.32]     | 0.13 [0.13, 0.13] | 0.54 [0.54, 0.54]    | 0.48 [0.48, 0.48]     |
+| condition      | TRL shipped (defaults)   | TRL shipped (tuned)   | PPO               | GRPO (canonical)    | GRPO (mean-centred)   |
+|:---------------|:-------------------------|:----------------------|:------------------|:--------------------|:----------------------|
+| synth-route/R1 | 1.32 [0.80, 1.67]        | 0.29 [-0.50, 1.36]    | 1.50 [1.31, 1.62] | 1.52 [1.33, 1.61]   | 1.03 [0.23, 1.54]     |
+| founders/R1    | 0.74 [-0.04, 1.22]       | 0.70 [-0.11, 1.21]    | 1.04 [0.42, 1.40] | 0.86 [0.20, 1.42]   | 0.81 [0.34, 1.22]     |
+| synth-route/R2 | -0.20 [-0.73, 0.16]      | 1.89 [1.82, 2.00]     | 2.28 [2.19, 2.34] | -0.18 [-0.68, 0.59] | 1.34 [1.21, 1.42]     |
+| founders/R2    | -0.37 [-0.98, -0.05]     | 0.61 [-0.01, 1.01]    | 0.86 [0.50, 1.52] | 0.82 [-0.09, 1.36]  | 0.63 [-0.54, 1.35]    |
 
 ### The same conditions and seeds at one and at four times the budget (pooled)
 
 | arm                    | 1x budget         |   1x budget: slots | 4x budget         |   4x budget: slots |
 |:-----------------------|:------------------|-------------------:|:------------------|-------------------:|
-| TRL shipped (defaults) | 0.38 [0.38, 0.38] |              2.041 | 0.40 [0.40, 0.40] |              2.064 |
-| TRL shipped (tuned)    | 0.51 [0.51, 0.51] |              2.714 | 0.75 [0.75, 0.75] |              2.699 |
-| PPO                    | 1.24 [1.24, 1.24] |              2.729 | 1.26 [1.26, 1.26] |              3.067 |
-| GRPO (canonical)       | 0.79 [0.79, 0.79] |              2.193 | 0.65 [0.65, 0.65] |              2.137 |
-| GRPO (mean-centred)    | 1.34 [1.34, 1.34] |              2.468 | 0.65 [0.65, 0.65] |              2.681 |
+| TRL shipped (defaults) | 0.36 [0.12, 0.58] |              2.055 | 0.37 [0.12, 0.61] |              2.063 |
+| TRL shipped (tuned)    | 0.55 [0.25, 0.84] |              2.752 | 0.87 [0.58, 1.18] |              2.711 |
+| PPO                    | 1.20 [0.92, 1.45] |              2.917 | 1.42 [1.24, 1.60] |              2.901 |
+| GRPO (canonical)       | 0.68 [0.42, 0.91] |              2.179 | 0.75 [0.46, 1.03] |              2.135 |
+| GRPO (mean-centred)    | 1.35 [1.01, 1.64] |              2.445 | 0.95 [0.63, 1.23] |              2.537 |
 
 ### Pairwise at four times the budget (descriptive)
 
 | comparison                                   | regimes   | difference              |     p | P(improvement)    | conditions won/tied/lost   |
 |:---------------------------------------------|:----------|:------------------------|------:|:------------------|:---------------------------|
-| GRPO (mean-centred) - TRL shipped (defaults) | R1+R2     | +0.251 [+0.251, +0.251] | 0.875 | 0.50 [0.50, 0.50] | 2/0/2                      |
-| GRPO (mean-centred) - TRL shipped (tuned)    | R1+R2     | -0.096 [-0.096, -0.096] | 0.876 | 0.50 [0.50, 0.50] | 2/0/2                      |
-| PPO - TRL shipped (defaults)                 | R1+R2     | +0.861 [+0.861, +0.861] | 0.126 | 1.00 [1.00, 1.00] | 4/0/0                      |
-| PPO - TRL shipped (tuned)                    | R1+R2     | +0.514 [+0.514, +0.514] | 0.249 | 0.75 [0.75, 0.75] | 3/0/1                      |
-| GRPO (mean-centred) - PPO                    | R1+R2     | -0.610 [-0.610, -0.610] | 0.249 | 0.25 [0.25, 0.25] | 1/0/3                      |
-| GRPO (canonical) - PPO                       | R1+R2     | -0.612 [-0.612, -0.612] | 1.000 | 0.75 [0.75, 0.75] | 3/0/1                      |
+| GRPO (mean-centred) - TRL shipped (defaults) | R1+R2     | +0.578 [+0.173, +0.954] | 0.085 | 0.67 [0.42, 0.92] | 1/3/0                      |
+| GRPO (mean-centred) - TRL shipped (tuned)    | R1+R2     | +0.079 [-0.155, +0.338] | 0.760 | 0.58 [0.42, 0.75] | 1/2/1                      |
+| PPO - TRL shipped (defaults)                 | R1+R2     | +1.046 [+0.848, +1.235] | 0.001 | 0.92 [0.75, 1.00] | 3/1/0                      |
+| PPO - TRL shipped (tuned)                    | R1+R2     | +0.547 [+0.311, +0.752] | 0.001 | 0.92 [0.75, 1.00] | 3/1/0                      |
+| GRPO (mean-centred) - PPO                    | R1+R2     | -0.468 [-0.733, -0.222] | 0.019 | 0.17 [0.00, 0.33] | 0/2/2                      |
+| GRPO (canonical) - PPO                       | R1+R2     | -0.666 [-0.866, -0.454] | 0.069 | 0.33 [0.08, 0.58] | 0/3/1                      |
+
+## E7 (post hoc, Amendment A4). A normaliser that does not shrink as the policy converges
+
+### At four times the budget (4 conditions x 3 seeds)
+
+| arm                                          | normalised return   |   below random |   slots |   runs |
+|:---------------------------------------------|:--------------------|---------------:|--------:|-------:|
+| TRL shipped (tuned)                          | 0.87 [0.58, 1.18]   |          0.250 |   2.711 |     12 |
+| PPO                                          | 1.42 [1.24, 1.60]   |          0.000 |   2.901 |     12 |
+| GRPO (mean-centred)                          | 0.95 [0.63, 1.23]   |          0.083 |   2.537 |     12 |
+| GRPO (mean-centred, reward-scale normaliser) | 1.12 [0.91, 1.29]   |          0.083 |   2.496 |     12 |
+
+| comparison                                                         | difference              |     p | conditions won/tied/lost   |
+|:-------------------------------------------------------------------|:------------------------|------:|:---------------------------|
+| GRPO (mean-centred, reward-scale normaliser) - GRPO (mean-centred) | +0.164 [-0.062, +0.434] | 0.412 | 1/3/0                      |
+| GRPO (mean-centred, reward-scale normaliser) - PPO                 | -0.304 [-0.470, -0.154] | 0.019 | 1/0/3                      |
+| GRPO (mean-centred, reward-scale normaliser) - TRL shipped (tuned) | +0.243 [+0.042, +0.453] | 0.236 | 2/2/0                      |
+
+Best against last checkpoint, per run:
+
+| arm                                          |   mean best checkpoint |   mean last checkpoint | runs ending more than 0.3 below their best   |
+|:---------------------------------------------|-----------------------:|-----------------------:|:---------------------------------------------|
+| PPO                                          |                  1.594 |                  1.419 | 2/12                                         |
+| GRPO (mean-centred)                          |                  1.522 |                  0.951 | 8/12                                         |
+| GRPO (mean-centred, reward-scale normaliser) |                  1.568 |                  1.115 | 6/12                                         |
+
+### At one times the budget (12 conditions x 3 seeds)
+
+| arm                                          | normalised return   |   below random |   slots |   runs |
+|:---------------------------------------------|:--------------------|---------------:|--------:|-------:|
+| TRL shipped (tuned)                          | 0.62 [0.45, 0.79]   |          0.250 |   2.761 |     36 |
+| PPO                                          | 1.08 [0.94, 1.23]   |          0.000 |   2.536 |     36 |
+| GRPO (mean-centred)                          | 0.99 [0.83, 1.15]   |          0.111 |   2.196 |     36 |
+| GRPO (mean-centred, reward-scale normaliser) | 1.01 [0.88, 1.14]   |          0.083 |   2.204 |     36 |
+
+| comparison                                                         | difference              |     p | conditions won/tied/lost   |
+|:-------------------------------------------------------------------|:------------------------|------:|:---------------------------|
+| GRPO (mean-centred, reward-scale normaliser) - GRPO (mean-centred) | +0.019 [-0.090, +0.139] | 0.777 | 0/12/0                     |
+| GRPO (mean-centred, reward-scale normaliser) - PPO                 | -0.071 [-0.168, +0.027] | 0.378 | 3/6/3                      |
+| GRPO (mean-centred, reward-scale normaliser) - TRL shipped (tuned) | +0.389 [+0.257, +0.516] | 0.004 | 8/3/1                      |
 
 ## E5. End to end through `VerifiableRL.fit` (classifier co-trained)
 
