@@ -99,6 +99,8 @@ def ladder(grpo: dict[str, Any], ppo: dict[str, Any]) -> dict[str, Arm]:
         "grpo_nostd": ("pg", {**base, "advantage": "group_nostd"}),
         "grpo": ("pg", {**base, "advantage": "group"}),
         "grpo_loo": ("pg", {**base, "advantage": "group_loo"}),
+        # Dr. GRPO (Liu et al., 2025): no std and no length normalisation
+        "dr_grpo": ("pg", {**base, "advantage": "group_nostd", "length_norm": False}),
         "ppo_g": ("pg", {**critic, "advantage": "gae"}),
         "ppo_priv": ("pg", {**critic, "advantage": "gae_priv"}),
     }

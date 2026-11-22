@@ -379,3 +379,58 @@ is not evidence, so:
 - *Tabular slots carry a constant 1,* so that a revealed slot is never the zero vector TRL uses for "not
   revealed".
 - *Stopping on the budget.* Training stops before the update that would exceed the budget, so no arm overspends.
+
+### A2 (2026-11-22, after tuning on dev seeds, before any confirmatory seed was run)
+
+**A2.1 The degeneracy guard gets a sound yardstick.** Version 1 left a condition out of pooled statistics when its
+anchor gap (best fixed set minus random) was under 2% of the regime's per-sample reward range. That range is the
+wrong yardstick in R2, where the per-sample reward grows as `1/prevalence` (23 for `fakejobs`) while the expected
+return lies in [-1, 1]: the rule would have dropped `fakejobs` R2, whose gap (0.22) is the largest of any R2
+condition, on a technicality. The guard is now: **a condition is degenerate when its anchor gap, averaged over
+seeds, is under 5% of its headroom** (clairvoyant bound minus random). On the dev seeds this drops one condition,
+`kickstarter` R2, where the random policy and the best fixed set differ by 0.015 (2% of headroom) and any
+normalised score would be noise divided by almost nothing. The anchors involve no arm, so the guard cannot see
+any result. Which conditions it drops is decided on the confirmatory seeds' anchors.
+
+**A2.2 Tuning score.** The score is as planned (mean normalised validation return at the end of the budget) with
+each dev condition's two anchors averaged over the three dev seeds, as in the confirmatory analysis, instead of
+taken from one seed (on seed 1000 `founders` R2's gap was 0.035 and its scores swamped the mean). Stage-2
+candidates were the union of each method's three best under both versions of the score; the sets differed by one
+configuration. `experiments/tune_search.csv`, `tune_finalists.csv`, `tune_chosen.json`.
+
+**A2.3 Frozen configurations** (`experiments/frozen_configs.json`), one per method for every dataset and regime:
+
+| Arm | Settings | Dev score (validation, 3 seeds x 4 conditions) |
+|---|---|---|
+| TRL shipped (tuned) | `policy_lr` 8.2e-5, `n_rollouts` 10, `max_depth` 4, `tau_info` 0.3, `tau_stop` 1, `update_every` 10, `train_epochs` 2, `policy_batch` 64, `eps` 0.3, `min_queries_frac` 1/3 | 0.96 |
+| PPO | lr 1.16e-3, critic lr x1, clip 0.3, 2 epochs, minibatch 1024, GAE lambda 0.8, entropy 0.03, 2048 episodes per update | 1.24 |
+| GRPO (canonical) | lr 1.13e-3, clip 0.1, 2 epochs, minibatch 256, G 8, 1024 episodes per update, KL 0.04, entropy 0.03 | 0.46 |
+| GRPO (mean-centred) | lr 1.61e-3, clip 0.3, 4 epochs, minibatch 256, G 32, 2048 episodes per update, KL 0, entropy 0 | 1.32 |
+
+Recorded so that the confirmatory result can be compared with it: on the dev seeds' *test* splits the same four
+configurations score 0.93, 1.28, 0.76 and 1.26. Mean-centred GRPO and PPO are tied on dev data.
+
+**A2.4 Number of seeds: a deviation.** The plan asked for the number of seeds that gives 90% power for a pooled
+difference of 0.05, capped at 30. The dev seeds show that target cannot be met: paired differences have a pooled
+standard deviation of 0.5 to 0.9 normalised units, so it would take more than 100 seeds, and at the measured cost
+(about 8 minutes of the 4-core machine per seed for E1's 60 runs) even the cap of 30 is about four hours for E1
+alone. **E1 runs seeds 0 to 9** (the plan's floor). With 10 seeds the pooled tests have 90% power for differences
+of roughly 0.17 (all conditions) to 0.30 (one regime); smaller differences will be reported as unresolved, not as
+equivalence. If compute remains after E2, E5 and E6, seeds 10 to 19 are added to E1; that decision depends on time
+only, never on a result, and the confirmatory analysis is run on every seed completed.
+
+**A2.5 Secondary experiments, sized to the compute.**
+
+- E2 as planned (ladder built on canonical GRPO's frozen settings, 10 seeds), plus one arm: Dr. GRPO (per-sample
+  mean, no std, no length normalisation; Liu et al., 2025, arXiv:2503.20783).
+- E3 (group size) with 5 seeds, for both GRPO variants.
+- E4 (four times the budget) with 3 seeds.
+- E5 (end to end, classifier co-trained, through `VerifiableRL.fit`): the shipped optimiser gets
+  `n_iterations=3`, the group optimiser `n_iterations=1` with its frozen settings; measured compute is then
+  roughly equal, slightly in the shipped optimiser's favour. 5 seeds; `founders` and `credit`, both regimes.
+- **E6 (new, exploratory, no training):** at the initial policy, the cosine between each advantage rule's update
+  direction and the true policy gradient, and the mean advantage each rule gives episodes by length
+  (`experiments/e6_gradient_bias.py`). It is there to explain H4's outcome, not to test anything.
+
+**A2.6 One more sensitivity analysis.** Beside the pooled tests, the same comparisons over all twelve conditions
+with returns scaled by headroom instead of by the anchor gap (defined everywhere, no condition dropped).

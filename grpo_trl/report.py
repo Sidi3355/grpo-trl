@@ -1,0 +1,279 @@
+"""Regenerate every table and figure from the raw run records.
+
+    python -m grpo_trl.report
+
+Writes ``results/summary/*.csv``, ``results/summary/TABLES.md`` and
+``results/figures/*.png``. Nothing here is typed by hand: the report's numbers
+are read off these files.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from . import analysis, figures, stats
+from .analysis import ARM_LABELS, SUMMARY, add_normalised, anchor_table, load_curves, load_runs
+from .run import RESULTS
+
+MAIN = ["mc_default", "mc_tuned", "ppo", "grpo", "grpo_nostd"]
+LADDER = ["pg_nobaseline", "grpo_batch", "ppo_g", "ppo_priv", "grpo", "grpo_loo", "grpo_nostd", "dr_grpo"]
+LADDER_LABELS = {
+    "pg_nobaseline": "no baseline (return only)",
+    "grpo_batch": "batch mean and std (groups of unrelated episodes)",
+    "ppo_g": "learned critic V(s) + GAE",
+    "ppo_priv": "privileged critic V(s, all features, label) + GAE",
+    "grpo": "per-sample mean and std (GRPO, canonical)",
+    "grpo_loo": "per-sample leave-one-out mean, group std",
+    "grpo_nostd": "per-sample mean (GRPO, mean-centred)",
+    "dr_grpo": "per-sample mean, no length normalisation (Dr. GRPO)",
+}
+
+
+def _md(table: pd.DataFrame, digits: int = 3) -> str:
+    return table.to_markdown(index=False, floatfmt=f".{digits}f")
+
+
+def _exists(exp: str) -> bool:
+    return (RESULTS / "raw" / exp).exists() and any((RESULTS / "raw" / exp).glob("*.json"))
+
+
+def condition_table(frame: pd.DataFrame, arms: list[str], column: str = "norm") -> pd.DataFrame:
+    """Conditions in rows, arms in columns: mean [95% CI] of ``column``."""
+    rows = []
+    for condition, group in frame.groupby("condition", sort=False):
+        row: dict[str, Any] = {"condition": condition}
+        for arm in arms:
+            values = group.loc[group["arm"] == arm, column].to_numpy()
+            if len(values):
+                mean, low, high = stats.mean_ci(values)
+                row[ARM_LABELS.get(arm, arm)] = f"{mean:.2f} [{low:.2f}, {high:.2f}]"
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def raw_table(frame: pd.DataFrame, arms: list[str], column: str) -> pd.DataFrame:
+    wide = frame.pivot_table(index="condition", columns="arm", values=column, sort=False)
+    wide = wide[[a for a in arms if a in wide.columns]].rename(columns=ARM_LABELS)
+    return wide.reset_index()
+
+
+def pairwise(frame: pd.DataFrame, pairs: list[tuple[str, str]], regimes: tuple[str, ...]) -> pd.DataFrame:
+    rows = []
+    for a, b in pairs:
+        result = analysis.compare(frame[frame["regime"].isin(regimes)], a, b)
+        if result.get("n_conditions"):
+            rows.append({
+                "comparison": f"{ARM_LABELS.get(a, a)} - {ARM_LABELS.get(b, b)}",
+                "regimes": "+".join(regimes),
+                "difference": analysis.fmt_ci(result["diff"], result["ci_low"], result["ci_high"]),
+                "p": result["p"],
+                "P(improvement)": f"{result['poi']:.2f} [{result['poi_low']:.2f}, {result['poi_high']:.2f}]",
+                "conditions won/tied/lost": f"{result['wins']}/{result['ties']}/{result['losses']}",
+            })
+    return pd.DataFrame(rows)
+
+
+def efficiency(frame: pd.DataFrame, curves: pd.DataFrame, anchors: pd.DataFrame) -> pd.DataFrame:
+    """Per arm: cost of a run, and the share of the budget needed to reach fixed levels."""
+    table = anchors.set_index("condition")
+    usable = curves[curves["condition"].isin(table.index[~table["degenerate"]])].copy()
+    usable["norm"] = (usable["test_ret"] - usable["condition"].map(table["random"])) / usable["condition"].map(table["gap"])
+    rows = []
+    for arm in MAIN:
+        mine, runs = frame[frame["arm"] == arm], usable[usable["arm"] == arm]
+        if mine.empty:
+            continue
+        row: dict[str, Any] = {
+            "arm": ARM_LABELS[arm],
+            "wall-clock s per run": mine["wall"].mean(),
+            "transitions per run": mine["transitions"].mean(),
+            "share of budget spent": (mine["compute"] / mine["budget"]).mean(),
+        }
+        for level in (0.5, 0.9, 1.0):
+            reached = []
+            for _, run in runs.groupby(["condition", "seed"]):
+                run = run.sort_values("compute")
+                hit = run[run["norm"] >= level]
+                reached.append(float(hit["compute"].iloc[0] / run["budget"].iloc[0]) if len(hit) else np.nan)
+            reached_array = np.array(reached)
+            row[f"runs reaching {level:g}"] = float(np.mean(~np.isnan(reached_array)))
+            row[f"median budget share to reach {level:g}"] = (
+                float(np.nanmedian(reached_array)) if (~np.isnan(reached_array)).mean() >= 0.5 else np.nan
+            )
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def main() -> None:
+    SUMMARY.mkdir(parents=True, exist_ok=True)
+    out: list[str] = ["# Result tables", "", "Generated by `python -m grpo_trl.report` from `results/raw/`. Do not edit.", ""]
+    frames: dict[str, pd.DataFrame] = {}
+    key: dict[str, Any] = {}
+
+    if _exists("e1"):
+        e1 = add_normalised(load_runs("e1"))
+        frames["e1"] = e1
+        anchors = anchor_table(e1)
+        curves = load_curves("e1")
+        analysis.save_table(e1, "e1_runs")
+        analysis.save_table(anchors, "e1_anchors")
+        key["e1_seeds"] = int(e1["seed"].nunique())
+        key["e1_runs"] = int(len(e1))
+        out += ["## E1. Reference policies (mean test return over seeds)", "",
+                _md(anchors[["condition", "prevalence", "ba_all_val", "random", "static", "reveal_all",
+                             "clairvoyant", "gap", "headroom", "degenerate", "n_seeds"]]), ""]
+        out += ["## E1. Normalised test return, mean [95% CI] over seeds", "",
+                "0 = random policy, 1 = best fixed set of slots.", "", _md(condition_table(e1, MAIN)), ""]
+        out += ["## E1. Raw test return (mean over seeds)", "", _md(raw_table(e1, MAIN, "test_ret")), ""]
+        aggregate = analysis.aggregate(e1, MAIN)
+        aggregate["arm"] = aggregate["arm"].map(ARM_LABELS)
+        analysis.save_table(aggregate, "e1_aggregate")
+        out += ["## E1. Pooled over conditions", "",
+                "`seed_sd`: standard deviation across seeds, averaged over conditions. `below_random` / "
+                "`above_static`: share of runs ending below the random policy / above the best fixed set.", "",
+                _md(aggregate), ""]
+        for regime in ("R1", "R2"):
+            part = analysis.aggregate(e1[e1["regime"] == regime], MAIN)
+            part["arm"] = part["arm"].map(ARM_LABELS)
+            analysis.save_table(part, f"e1_aggregate_{regime}")
+            out += [f"### {regime} only", "", _md(part[["arm", "mean_norm", "low", "high", "iqm", "seed_sd",
+                                                       "below_random", "above_static", "slots"]]), ""]
+        pairs = [("grpo_nostd", "ppo"), ("grpo_nostd", "mc_tuned"), ("grpo_nostd", "mc_default"),
+                 ("grpo_nostd", "grpo"), ("grpo", "ppo"), ("grpo", "mc_tuned"), ("ppo", "mc_tuned"),
+                 ("mc_tuned", "mc_default")]
+        all_pairs = pd.concat([pairwise(e1, pairs, r) for r in (("R1", "R2"), ("R1",), ("R2",))])
+        analysis.save_table(all_pairs, "e1_pairwise")
+        out += ["## E1. Pairwise differences in normalised test return (descriptive; unadjusted p)", "",
+                _md(all_pairs), ""]
+        endpoint = pd.concat([pairwise(e1.assign(norm=e1["norm_valbest"]), pairs[:3], r) for r in (("R1", "R2"),)])
+        out += ["## E1. Sensitivity: validation-selected checkpoint instead of the last", "", _md(endpoint), ""]
+        for metric, label in (("test_n_slots", "slots revealed"), ("test_cost", "acquisition cost"),
+                              ("test_precision", "precision"), ("test_recall", "recall"),
+                              ("test_f05", "F0.5"), ("test_bal_acc", "balanced accuracy"),
+                              ("test_called", "share called positive"), ("test_n_paths", "distinct paths")):
+            out += [f"## E1. {label} (mean over seeds)", "", _md(raw_table(e1, MAIN, metric)), ""]
+        gap = e1.assign(gap=e1["train_ret"] - e1["test_ret"])
+        out += ["## E1. Train minus test return", "", _md(raw_table(gap, MAIN, "gap")), ""]
+        eff = efficiency(e1, curves, anchors)
+        analysis.save_table(eff, "e1_efficiency")
+        out += ["## E1. Cost and speed", "", _md(eff), ""]
+        # H1 at matched transitions: GRPO arms read at their last checkpoint within PPO's transitions
+        matched = matched_transitions(e1, curves, anchors)
+        if len(matched):
+            analysis.save_table(matched, "e1_matched_transitions")
+            out += ["## E1. Sensitivity: matched environment transitions (PPO's critic free of charge)", "",
+                    _md(matched), ""]
+        figures.main_results(e1)
+        figures.learning_curves(curves, anchors)
+        figures.behaviour(e1)
+
+    if _exists("e2"):
+        e2 = add_normalised(load_runs("e2"))
+        frames["e2"] = e2
+        analysis.save_table(e2, "e2_runs")
+        ladder = analysis.aggregate(e2, LADDER)
+        ladder["arm"] = ladder["arm"].map(LADDER_LABELS)
+        analysis.save_table(ladder, "e2_ladder")
+        out += ["## E2. Baseline ladder: pooled normalised test return", "",
+                _md(ladder[["arm", "mean_norm", "low", "high", "iqm", "seed_sd", "below_random", "above_static", "slots"]]), ""]
+        out += ["### By condition", "", _md(raw_table(e2, LADDER, "norm").rename(columns=LADDER_LABELS)), ""]
+        pairs = [("grpo", "grpo_batch"), ("grpo_nostd", "grpo_batch"), ("grpo_nostd", "grpo"),
+                 ("grpo_nostd", "ppo_priv"), ("grpo_nostd", "ppo_g"), ("ppo_priv", "ppo_g"),
+                 ("grpo_nostd", "dr_grpo"), ("grpo_nostd", "grpo_loo"), ("grpo_batch", "pg_nobaseline")]
+        ladder_pairs = pairwise(e2.assign(arm=e2["arm"]), pairs, ("R1", "R2"))
+        ladder_pairs["comparison"] = [f"{a} - {b}" for a, b in pairs][: len(ladder_pairs)]
+        analysis.save_table(ladder_pairs, "e2_pairwise")
+        out += ["### Pairwise (descriptive; unadjusted p)", "", _md(ladder_pairs), ""]
+        figures.ladder(e2, LADDER, LADDER_LABELS, "fig4_baseline_ladder",
+                       "What the advantage is measured against (same data, same clipped objective)")
+
+    if _exists("e3"):
+        e3 = add_normalised(load_runs("e3"))
+        frames["e3"] = e3
+        e3["base"] = e3["arm"].str.rsplit("_G", n=1).str[0]
+        e3["G"] = e3["arm"].str.rsplit("_G", n=1).str[1].astype(int)
+        sizes = e3[~e3["degenerate"]].groupby(["base", "G"])["norm"].mean().unstack("G").reset_index()
+        analysis.save_table(sizes, "e3_group_size")
+        out += ["## E3. Group size: pooled normalised test return", "", _md(sizes), ""]
+        figures.group_size(e3)
+
+    if _exists("e4"):
+        e4 = add_normalised(load_runs("e4"))
+        frames["e4"] = e4
+        analysis.save_table(e4, "e4_runs")
+        out += ["## E4. Four times the budget: normalised test return, mean [95% CI]", "",
+                _md(condition_table(e4, MAIN)), ""]
+
+    if _exists("e5"):
+        e5 = load_runs_e5()
+        analysis.save_table(e5, "e5_runs")
+        summary = e5.groupby(["condition", "arm"], sort=False).agg(
+            test_ret=("test_ret", "mean"), f05=("f05", "mean"), precision=("precision", "mean"),
+            recall=("recall", "mean"), slots=("n_slots", "mean"), fit_seconds=("fit_seconds", "mean"),
+            n=("seed", "nunique"),
+        ).reset_index()
+        analysis.save_table(summary, "e5_summary")
+        out += ["## E5. End to end through `VerifiableRL.fit` (classifier co-trained)", "", _md(summary), ""]
+
+    tests = analysis.confirmatory(frames)
+    if len(tests):
+        analysis.save_table(tests, "confirmatory_tests")
+        shown = tests.assign(
+            difference=[analysis.fmt_ci(r["diff"], r["ci_low"], r["ci_high"]) for _, r in tests.iterrows()],
+            poi=[f"{r['poi']:.2f} [{r['poi_low']:.2f}, {r['poi_high']:.2f}]" for _, r in tests.iterrows()],
+            wtl=[f"{r['wins']}/{r['ties']}/{r['losses']}" for _, r in tests.iterrows()],
+        )[["hypothesis", "claim", "n_conditions", "n_pairs", "difference", "p", "p_holm", "poi", "wtl", "robust", "verdict"]]
+        out[4:4] = ["## Confirmatory tests", "",
+                    "Pooled paired difference in normalised test return (first arm minus second), 95% stratified "
+                    "bootstrap CI, sign-flip permutation p, Holm-adjusted over the family. Non-inferiority margin 0.10.",
+                    "", _md(shown, digits=4), ""]
+        figures.hypothesis_forest(tests)
+        key["tests"] = json.loads(tests.to_json(orient="records"))
+
+    (SUMMARY / "TABLES.md").write_text("\n".join(out) + "\n")
+    (SUMMARY / "key_numbers.json").write_text(json.dumps(key, indent=1))
+    print(f"wrote {SUMMARY / 'TABLES.md'}")
+
+
+def matched_transitions(e1: pd.DataFrame, curves: pd.DataFrame, anchors: pd.DataFrame) -> pd.DataFrame:
+    """Compare GRPO arms with PPO at PPO's final transition count."""
+    table = anchors.set_index("condition")
+    rows = []
+    for arm in ("grpo", "grpo_nostd"):
+        differences: dict[str, list[float]] = {}
+        for (condition, seed), group in curves[curves["arm"].isin([arm, "ppo"])].groupby(["condition", "seed"]):
+            if table.loc[condition, "degenerate"]:
+                continue
+            ppo = group[group["arm"] == "ppo"].sort_values("transitions")
+            mine = group[group["arm"] == arm].sort_values("transitions")
+            if ppo.empty or mine.empty:
+                continue
+            within = mine[mine["transitions"] <= ppo["transitions"].iloc[-1]]
+            value = within["test_ret"].iloc[-1]
+            differences.setdefault(str(condition), []).append(
+                float((value - ppo["test_ret"].iloc[-1]) / table.loc[condition, "gap"])
+            )
+        if differences:
+            arrays = {c: np.array(v) for c, v in differences.items()}
+            low, high = stats.stratified_bootstrap(arrays)
+            rows.append({
+                "comparison": f"{ARM_LABELS[arm]} - PPO, at PPO's transition count",
+                "difference": analysis.fmt_ci(stats.pooled_mean(arrays), low, high),
+                "p": stats.sign_flip_p(arrays),
+            })
+    return pd.DataFrame(rows)
+
+
+def load_runs_e5() -> pd.DataFrame:
+    rows = [json.loads(p.read_text()) for p in sorted((RESULTS / "raw" / "e5").glob("*.json"))]
+    frame = pd.DataFrame(rows)
+    frame["condition"] = frame["dataset"] + "/" + frame["regime"]
+    return frame
+
+
+if __name__ == "__main__":
+    main()
