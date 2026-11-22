@@ -62,7 +62,11 @@ def curve_series(curves: pd.DataFrame, anchors: pd.DataFrame, regime: str) -> di
 
 
 def fragments() -> dict[str, str]:
-    parts: dict[str, str] = {"chart_css": svg.CSS}
+    parts: dict[str, str] = {
+        "chart_css": svg.CSS,
+        "style": (ROOT / "docs" / "report_style.css").read_text(),
+        "robustness": (ROOT / "docs" / "report_robustness.html").read_text(),
+    }
     e1 = add_normalised(load_runs("e1"))
     anchors = anchor_table(e1)
     curves = load_curves("e1")
@@ -78,15 +82,19 @@ def fragments() -> dict[str, str]:
             f"{title}: mean normalised test return as the budget is spent",
             x_label="share of the compute budget (1 = one default TRL pass over the training set)",
         )
-    aggregate = analysis.aggregate(e1, ARM_ORDER)
+    aggregate = analysis.aggregate(e1, ARM_ORDER).sort_values("mean_norm", ascending=False)
+    by_regime = {
+        regime: analysis.aggregate(e1[e1["regime"] == regime], ARM_ORDER).set_index("arm")["mean_norm"]
+        for regime in ("R1", "R2")
+    }
     pooled = pd.DataFrame({
         "Optimiser": aggregate["arm"].map(svg.NAMES),
-        "Normalised return": [f"{m:.2f}" for m in aggregate["mean_norm"]],
+        "Return": [f"{m:.2f}" for m in aggregate["mean_norm"]],
         "95% CI": [f"{a:.2f} to {b:.2f}" for a, b in zip(aggregate["low"], aggregate["high"], strict=True)],
-        "Runs below random": [f"{v:.0%}" for v in aggregate["below_random"]],
-        "Runs above best fixed set": [f"{v:.0%}" for v in aggregate["above_static"]],
-        "Slots revealed": [f"{v:.2f}" for v in aggregate["slots"]],
-        "Seconds per run": [f"{v:.0f}" for v in aggregate["wall"]],
+        "R1": [f"{by_regime['R1'][a]:.2f}" for a in aggregate["arm"]],
+        "R2": [f"{by_regime['R2'][a]:.2f}" for a in aggregate["arm"]],
+        "Below random": [f"{v:.0%}" for v in aggregate["below_random"]],
+        "Seconds": [f"{v:.0f}" for v in aggregate["wall"]],
     })
     parts["table_pooled"] = table(pooled, numeric=tuple(pooled.columns[1:]))
     frames = {"e1": e1}

@@ -1,0 +1,542 @@
+diff --git a/docs/source/changelog.rst b/docs/source/changelog.rst
+index 6b147f7..b4cbdd5 100644
+--- a/docs/source/changelog.rst
++++ b/docs/source/changelog.rst
+@@ -1,6 +1,19 @@
+ Changelog
+ =========
+ 
++Unreleased
++----------
++- VerifiableRL can learn its policy from whole episodes: ``VerifiableRL(..., optimizer="group")``. For each training
++  sample the policy plays ``group_size`` episodes; an episode's advantage is its return minus the mean return of its
++  group, so whatever the group shares (the label, the slots nobody revealed) cancels and no value network is
++  needed; the policy is then improved on PPO's clipped objective (``clip_range``). This is GRPO (Shao et al., 2024)
++  without its division by the group's standard deviation, which makes a sample whose episodes differ only by a slot
++  cost weigh as much as one whose episodes differ by a right or a wrong call. Unlike the rollout targets, the return
++  includes the slot costs and the step penalty, so the policy learns *when to stop* from what continuing is worth.
++  It needs no rollouts: a pass over the samples costs a fraction of a rollout pass. ``optimizer="rollout"``, the
++  paper's method, stays the default, and nothing changes for existing code. New ``group_size``, ``group_batch``,
++  ``group_epochs``, ``group_lr`` and ``clip_range``; the supervisor then advises only when predicting.
++
+ 0.4.4 (2026-11-20)
+ ------------------
+ - The teacher sends one case first, then the rest together. A model can read the policy from its cache only once a
+diff --git a/tests/verifiable_rl/test_verifiable_rl.py b/tests/verifiable_rl/test_verifiable_rl.py
+index ab71f36..3bf9ff4 100644
+--- a/tests/verifiable_rl/test_verifiable_rl.py
++++ b/tests/verifiable_rl/test_verifiable_rl.py
+@@ -18,8 +18,21 @@ from think_reason_learn.exceptions import DataError, ProviderAuthError
+ from think_reason_learn.llm import LLMSession, Usage, resolve_models
+ from think_reason_learn.testing import FakeLLM, GenerateRequest, fake_llms
+ from think_reason_learn.verifiable_rl import VerifiableRL
+-from think_reason_learn.verifiable_rl._episodes import Sample, Search, rollouts, targets
+-from think_reason_learn.verifiable_rl._networks import Classifier, PolicyNet
++from think_reason_learn.verifiable_rl._episodes import (
++    Sample,
++    Search,
++    allowed_actions,
++    greedy,
++    policy_probs,
++    rollouts,
++    targets,
++)
++from think_reason_learn.verifiable_rl._group import advantages, play
++from think_reason_learn.verifiable_rl._networks import (
++    Classifier,
++    PolicyNet,
++    action_log_probs,
++)
+ from think_reason_learn.verifiable_rl._supervisor import Supervisor, boost, is_uncertain
+ 
+ SLOTS = {"signal": 2, "noise": 2, "more_noise": 2}
+@@ -300,3 +313,119 @@ def test_fits_at_once_build_the_same_networks() -> None:
+     for thread in threads:
+         thread.join()
+     assert all(torch.equal(runs[0][0], w) for run in runs for w in run)
++
++
++grouped = partial(
++    fast, optimizer="group", group_size=4, group_batch=40, group_lr=1e-2, n_iterations=6
++)
++
++
++def test_group_optimizer_contract(tmp_path: Path) -> None:
++    check_constructor("VerifiableRL", grouped)
++    model = grouped().fit(X, Y)
++    predicted = model.predict(X)
++    assert (predicted == Y).mean() >= 0.8
++    assert (pickle.loads(pickle.dumps(model)).predict(X) == predicted).all()
++    assert (VerifiableRL.load(model.save(tmp_path / "m")).predict(X) == predicted).all()
++    paths = model.decision_paths(X)
++    assert all(path and len(path) == len(set(path)) for path in paths)
++
++
++def test_group_optimizer_learns_when_to_stop_from_slot_costs() -> None:
++    # only ``signal`` tells the label: with costly slots the policy reads it and stops
++    model = grouped(
++        slot_costs={"signal": 0.1, "noise": 0.5, "more_noise": 0.5},
++        reward_tp=1.0,
++        reward_fp=-1.0,
++        reward_tn=1.0,
++        reward_fn=-1.0,
++        step_penalty=0.0,
++        reward_threshold=0.5,
++        threshold=0.5,
++        freeze_clf_updates=10**9,  # judge the policy against a fixed classifier
++        n_iterations=20,
++    ).fit(X, Y)
++    paths = model.decision_paths(X)
++    assert np.mean([path == ["signal"] for path in paths]) >= 0.9
++    assert (model.predict(X) == Y).mean() >= 0.8
++
++
++def test_group_optimizer_is_deterministic_and_leaves_global_torch_state() -> None:
++    torch.default_generator.manual_seed(123)
++    before = torch.get_rng_state()
++    first, second = grouped().fit(X, Y), grouped().fit(X, Y)
++    assert torch.equal(before, torch.get_rng_state())
++    assert np.allclose(first.predict_proba(X), second.predict_proba(X))
++
++
++def test_an_unknown_optimizer_is_refused() -> None:
++    with pytest.raises(ValueError, match="optimizer"):
++        fast(optimizer="ppo").fit(X, Y)
++
++
++def test_played_episodes_follow_the_rules_and_pay_trl_returns() -> None:
++    search = Search(1, 1, 2, 1.0, 4.0, 4.0, -16.0, 0.0, -0.25, -0.1, -5.0, 0.3)
++    columns, costs = np.repeat(np.arange(3), 2), np.array([0.5, 0.0, 0.25])
++    networks = _networks()
++    positive = (Y == "hit").astype(np.float32)
++    samples = np.repeat(np.arange(20), 8)
++    episodes = play(
++        X,
++        positive,
++        samples,
++        (columns, costs),
++        networks,
++        search,
++        3,
++        np.random.default_rng(0),
++    )
++    reveals = episodes.finals.sum(axis=1)
++    assert (reveals >= 2).all() and (reveals <= 3).all()
++    stops = (episodes.actions == 3) & episodes.decided
++    assert (episodes.masks.sum(axis=2)[stops] >= 2).all()  # STOP only after min_queries
++    for row, made in zip(episodes.actions, episodes.decided, strict=True):
++        slots = [a for a in row[made].tolist() if a < 3]
++        assert len(slots) == len(set(slots))  # never a slot twice
++    for i in range(
++        0, len(samples), 17
++    ):  # the return is what a rollout ending there pays
++        sample = Sample(torch.tensor(X[samples[i]]), columns, costs)
++        depth = int(reveals[i])
++        at_end = Search(1, depth, 2, 1.0, 4.0, 4.0, -16.0, 0.0, -0.25, -0.1, -5.0, 0.3)
++        paid, _ = rollouts(
++            sample,
++            episodes.finals[i][None, :],
++            depth,
++            networks,
++            int(positive[samples[i]]),
++            at_end,
++            np.random.default_rng(0),
++        )
++        assert math.isclose(episodes.returns[i], paid[0], abs_tol=1e-6)
++
++
++def test_group_advantages_are_centred_per_sample_on_one_scale() -> None:
++    returns = np.array([1.0, 3.0, 10.0, 30.0])
++    advantage = advantages(returns, 2)
++    assert np.allclose(advantage.reshape(2, 2).sum(axis=1), 0.0)
++    assert math.isclose(advantage[3] / advantage[1], 10.0)  # no per-group rescaling
++    assert math.isclose(float(advantage.std()), 1.0, rel_tol=1e-4)
++
++
++def test_action_log_probs_rank_actions_as_greedy_does() -> None:
++    policy = PolicyNet(6, 3, 16)
++    states = torch.tensor(X)
++    masks = np.random.default_rng(1).random((60, 3)) < 0.4
++    masks[masks.all(axis=1), 0] = False
++    allowed = allowed_actions(masks, 1)
++    with torch.no_grad():
++        log_probs = action_log_probs(policy(states), torch.tensor(allowed))
++    assert (
++        log_probs.argmax(dim=1).numpy() == greedy(policy_probs(policy, states), allowed)
++    ).all()
++    assert torch.allclose(log_probs.exp().sum(dim=1), torch.ones(60), atol=1e-5)
++    saturated = action_log_probs(
++        torch.tensor([[0.0, 1.0, 2.0, 80.0]]),
++        torch.tensor([[True, True, False, False]]),
++    )
++    assert torch.isfinite(saturated[0, :2]).all()
+diff --git a/think_reason_learn/verifiable_rl/_group.py b/think_reason_learn/verifiable_rl/_group.py
+new file mode 100644
+index 0000000..49c71c8
+--- /dev/null
++++ b/think_reason_learn/verifiable_rl/_group.py
+@@ -0,0 +1,180 @@
++"""Group-relative policy optimisation: whole episodes, compared within a sample.
++
++For each training sample the policy plays a group of episodes. An episode's
++advantage is its return minus the mean return of its group, so whatever the
++group shares (the label, the slots nobody revealed) cancels, and no value
++network is needed. The policy is then improved on PPO's clipped objective
++(Schulman et al., 2017). This is GRPO (Shao et al., 2024, arXiv:2402.03300)
++with one change: the advantage is not divided by the group's standard deviation.
++With slot costs that division weighs a sample whose episodes differ only by a
++cost as much as one whose episodes differ by a right or a wrong call, and the
++policy learns to stop at once.
++
++Unlike the rollout targets, the return an episode is scored by includes the slot
++costs and the step penalty, so STOP is learned from what continuing is worth.
++"""
++
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++import numpy as np
++import numpy.typing as npt
++import torch
++import torch.nn as nn
++
++from ._episodes import Masks, Search, allowed_actions, policy_probs, sample_actions
++from ._networks import Classifier, PolicyNet, action_log_probs
++from ._torch import shuffled_batches, tensor
++
++
++@dataclass(frozen=True, slots=True)
++class Episodes:
++    """Episodes the policy played, padded to the longest one allowed."""
++
++    samples: npt.NDArray[np.intp]
++    """The sample of each episode."""
++    masks: Masks
++    """Slots revealed before each decision, shape ``(episodes, steps, slots)``."""
++    actions: npt.NDArray[np.intp]
++    log_probs: npt.NDArray[np.float64]
++    """Log-probability of each action when it was taken."""
++    decided: npt.NDArray[np.bool_]
++    """Whether a decision was made at each step."""
++    returns: npt.NDArray[np.float64]
++    finals: Masks
++    """Slots revealed when each episode ended."""
++
++
++def play(
++    features: npt.NDArray[np.float32],
++    positive: npt.NDArray[np.float32],
++    samples: npt.NDArray[np.intp],
++    layout: tuple[npt.NDArray[np.intp], npt.NDArray[np.float64]],
++    networks: tuple[PolicyNet, Classifier],
++    search: Search,
++    max_steps: int,
++    rng: np.random.Generator,
++) -> Episodes:
++    """Play one episode per entry of ``samples``, sampling from the policy.
++
++    An episode reveals unseen slots until it picks STOP (allowed after
++    ``min_queries``), has revealed every slot, or has revealed ``max_steps``.
++    Its return is the reward of the classifier's call on what was revealed,
++    minus the revealed slots' costs, plus the step penalty per reveal.
++
++    Args:
++        features: Every training sample's features.
++        positive: 1 for each positive sample, else 0.
++        samples: The sample of each episode.
++        layout: The slot of each feature column, and each slot's cost.
++        networks: The policy and the classifier that scores the final call.
++        search: The reward settings and ``min_queries``.
++        max_steps: Most slots revealed per episode.
++        rng: Draws the actions.
++    """
++    (columns, costs), (policy, classifier) = layout, networks
++    device = next(policy.parameters()).device
++    n, n_slots = len(samples), len(costs)
++    seen = np.zeros((n, n_slots), dtype=bool)
++    masks = np.zeros((n, max_steps, n_slots), dtype=bool)
++    actions = np.zeros((n, max_steps), dtype=np.intp)
++    log_probs = np.zeros((n, max_steps))
++    decided = np.zeros((n, max_steps), dtype=bool)
++    active = np.ones(n, dtype=bool)
++    for step in range(max_steps):
++        rows = np.flatnonzero(active)
++        if not len(rows):
++            break
++        allowed = allowed_actions(seen[rows], search.min_queries)
++        states = tensor(features[samples[rows]] * seen[rows][:, columns], device)
++        # the smallest weight keeps an allowed action possible when STOP saturates
++        probs = np.where(allowed, policy_probs(policy, states) + 1e-12, 0.0)
++        probs /= probs.sum(axis=1, keepdims=True)
++        chosen = sample_actions(probs, rng)
++        masks[rows, step], actions[rows, step], decided[rows, step] = (
++            seen[rows],
++            chosen,
++            True,
++        )
++        log_probs[rows, step] = np.log(probs[np.arange(len(rows)), chosen])
++        reveal = chosen < n_slots
++        seen[rows[reveal], chosen[reveal]] = True
++        revealed = seen[rows].sum(axis=1)
++        active[rows[~reveal | (revealed >= min(n_slots, max_steps))]] = False
++    finals = tensor(features[samples] * seen[:, columns], device)
++    labels = positive[samples] > 0.5
++    with torch.no_grad():
++        called = (
++            (torch.sigmoid(classifier(finals)) >= search.reward_threshold).cpu().numpy()
++        )
++    call_rewards = np.where(
++        labels,
++        np.where(called, search.reward_tp, search.reward_fn),
++        np.where(called, search.reward_fp, search.reward_tn),
++    )
++    returns = call_rewards - seen @ costs + search.step_penalty * seen.sum(axis=1)
++    return Episodes(samples, masks, actions, log_probs, decided, returns, seen)
++
++
++def advantages(
++    returns: npt.NDArray[np.float64], group_size: int
++) -> npt.NDArray[np.float64]:
++    """Each episode's return minus its group's mean, on one scale for the batch.
++
++    ``returns`` holds the groups one after another. The centred returns are
++    divided by their standard deviation over the whole batch, so the step size
++    does not depend on the reward's units while samples keep their relative
++    weight.
++    """
++    grouped = returns.reshape(-1, group_size)
++    centred = (grouped - grouped.mean(axis=1, keepdims=True)).reshape(-1)
++    return centred / (centred.std() + 1e-6)
++
++
++def improve(
++    policy: PolicyNet,
++    optimiser: torch.optim.Optimizer,
++    states: torch.Tensor,
++    episodes: Episodes,
++    advantage: npt.NDArray[np.float64],
++    settings: tuple[int, float, int, int, float],
++    shuffle: torch.Generator,
++) -> None:
++    """Raise the probability of the better episodes' actions, within a clip range.
++
++    Every decision of an episode gets the episode's advantage, weighted by one
++    over the episode's length, as in GRPO.
++
++    Args:
++        policy: The policy to improve.
++        optimiser: Its optimiser.
++        states: The state before each decision, one row per decision.
++        episodes: The episodes the decisions come from.
++        advantage: One advantage per episode.
++        settings: ``min_queries``, the clip range, epochs, batch size and the
++            gradient-norm clip.
++        shuffle: Orders the batches.
++    """
++    min_queries, clip_range, epochs, batch_size, grad_clip = settings
++    episode, step = np.nonzero(episodes.decided)
++    allowed = tensor(
++        allowed_actions(episodes.masks[episode, step], min_queries), states.device
++    )
++    actions = tensor(episodes.actions[episode, step], states.device)
++    old = tensor(episodes.log_probs[episode, step], states)
++    weight = tensor(1.0 / episodes.decided.sum(axis=1)[episode], states)
++    gain = tensor(advantage[episode], states)
++    for _ in range(epochs):
++        for batch in shuffled_batches(len(episode), batch_size, shuffle):
++            log_probs = action_log_probs(policy(states[batch]), allowed[batch])
++            taken = log_probs.gather(1, actions[batch, None]).squeeze(1)
++            ratio = torch.exp(taken - old[batch])
++            clipped = ratio.clamp(1 - clip_range, 1 + clip_range)
++            surrogate = torch.minimum(ratio * gain[batch], clipped * gain[batch])
++            loss = -(weight[batch] * surrogate).sum() / weight[batch].sum()
++            optimiser.zero_grad(set_to_none=True)
++            loss.backward()  # pyright: ignore[reportUnknownMemberType]  # partial annotation
++            if grad_clip:
++                nn.utils.clip_grad_norm_(policy.parameters(), grad_clip)
++            optimiser.step()
+diff --git a/think_reason_learn/verifiable_rl/_networks.py b/think_reason_learn/verifiable_rl/_networks.py
+index 53a003a..c33fee7 100644
+--- a/think_reason_learn/verifiable_rl/_networks.py
++++ b/think_reason_learn/verifiable_rl/_networks.py
+@@ -30,6 +30,20 @@ def action_probs(logits: torch.Tensor) -> torch.Tensor:
+     return torch.cat([torch.softmax(logits[:, :-1], dim=1) * go_on, stop], dim=1)
+ 
+ 
++def action_log_probs(logits: torch.Tensor, allowed: torch.Tensor) -> torch.Tensor:
++    """Log-probabilities over the allowed actions: ``action_probs``, renormalised.
++
++    Computed in log space, so a saturated STOP gives no 0/0. The most likely
++    action is the one ``greedy`` picks from ``action_probs``.
++    """
++    go_on = nn.functional.logsigmoid(-logits[:, -1:])
++    stop = nn.functional.logsigmoid(logits[:, -1:])
++    slots = torch.log_softmax(logits[:, :-1], dim=1) + go_on
++    log_probs = torch.cat([slots, stop], dim=1)
++    log_probs = log_probs.masked_fill(~allowed, -torch.inf)
++    return log_probs - torch.logsumexp(log_probs, dim=1, keepdim=True)
++
++
+ class Classifier(nn.Module):
+     """The logit of the positive class from a partly observed state."""
+ 
+diff --git a/think_reason_learn/verifiable_rl/_verifiable_rl.py b/think_reason_learn/verifiable_rl/_verifiable_rl.py
+index 4d0b14e..55715b7 100644
+--- a/think_reason_learn/verifiable_rl/_verifiable_rl.py
++++ b/think_reason_learn/verifiable_rl/_verifiable_rl.py
+@@ -8,6 +8,8 @@ Each sample's features come in named slots (e.g. education, jobs). A policy
+ network chooses which slot to reveal next, or to stop; a classifier predicts the
+ label from what was revealed. The policy learns from Monte Carlo rollouts scored
+ by cost-aware, asymmetric rewards; an optional LLM supervisor breaks near-ties.
++``optimizer="group"`` learns from whole episodes compared within each sample
++instead (see ``_group``).
+ """
+ 
+ from __future__ import annotations
+@@ -46,6 +48,7 @@ from ._episodes import (
+     policy_probs,
+     targets,
+ )
++from ._group import advantages, improve, play
+ from ._networks import Classifier, PolicyNet
+ from ._supervisor import Supervisor
+ from ._torch import (
+@@ -82,6 +85,20 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
+         step_penalty, repeat_penalty: Added per step and per repeated query.
+         reward_threshold: Classifier probability counted as a positive call.
+         tau_info, tau_stop: Temperatures of the policy targets.
++        optimizer: How the policy learns. ``"rollout"`` (the paper's) fits it to
++            targets from rollouts of every action at every visited state.
++            ``"group"`` plays ``group_size`` whole episodes per sample and raises
++            the probability of those that beat their group's mean return, within
++            ``clip_range`` (GRPO without its division by the group's standard
++            deviation). It needs no rollouts, so a pass costs far less, and it
++            learns when to stop from the slot costs and the step penalty, which
++            the rollout targets do not. The supervisor then advises only when
++            predicting.
++        group_size: Episodes played per sample by ``optimizer="group"``.
++        group_batch: Episodes between its policy updates.
++        group_epochs: Passes over those episodes per update.
++        group_lr: Its learning rate (``policy_lr`` is the rollout optimiser's).
++        clip_range: How far one update may move an action's probability ratio.
+         n_iterations: Passes over the training samples.
+         update_every: Samples between network updates.
+         policy_lr, clf_lr: Learning rates. The defaults (0.2's) suit thousands of
+@@ -131,6 +148,12 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
+         reward_threshold: float = 0.3,
+         tau_info: float = 1.0,
+         tau_stop: float = 4.0,
++        optimizer: str = "rollout",
++        group_size: int = 32,
++        group_batch: int = 2048,
++        group_epochs: int = 4,
++        group_lr: float = 1.5e-3,
++        clip_range: float = 0.3,
+         n_iterations: int = 1,
+         update_every: int = 25,
+         policy_lr: float = 5e-5,
+@@ -176,6 +199,12 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
+         self.reward_threshold = reward_threshold
+         self.tau_info = tau_info
+         self.tau_stop = tau_stop
++        self.optimizer = optimizer
++        self.group_size = group_size
++        self.group_batch = group_batch
++        self.group_epochs = group_epochs
++        self.group_lr = group_lr
++        self.clip_range = clip_range
+         self.n_iterations = n_iterations
+         self.update_every = update_every
+         self.policy_lr = policy_lr
+@@ -223,6 +252,10 @@ class VerifiableRL(Persistable, ClassifierMixin, BaseEstimator):
+             slot_texts: Text of each slot per sample, for the supervisor.
+         """
+         forget_fitted(self)
++        if self.optimizer not in ("rollout", "group"):
++            raise ValueError(
++                f'optimizer={self.optimizer!r} is not "rollout" or "group".'
++            )
+         try:
+             features = self._layout(X, fitting=True)
+             classes, codes = encode_labels(y)
+@@ -491,18 +524,77 @@ class _Trainer:
+         model = self.model
+         self.shuffle.manual_seed(int(self.rng.integers(2**31)))
+         target = self._frozen_copy() if model.clf_target_update_every else None
++        grouped = model.optimizer == "group"
+         optimisers = (
+-            torch.optim.Adam(model.policy_.parameters(), lr=model.policy_lr),
++            torch.optim.Adam(
++                model.policy_.parameters(),
++                lr=model.group_lr if grouped else model.policy_lr,
++            ),
+             torch.optim.Adam(model.classifier_.parameters(), lr=model.clf_lr),
+         )
+         for _ in range(model.n_iterations):
+-            for count, i in enumerate(self.rng.permutation(len(self.features)), 1):
++            order = self.rng.permutation(len(self.features))
++            if grouped:
++                per_update = max(1, model.group_batch // model.group_size)
++                for start in range(0, len(order), per_update):
++                    self._groups(order[start : start + per_update], optimisers, target)
++                continue
++            for count, i in enumerate(order, 1):
+                 self._episode(int(i), target or model.classifier_)
+                 if count % model.update_every == 0:
+                     self._update(optimisers, target)
+             if len(self.features) % model.update_every:
+                 self._update(optimisers, target)
+ 
++    def _groups(
++        self,
++        samples: npt.NDArray[np.intp],
++        optimisers: tuple[torch.optim.Optimizer, torch.optim.Optimizer],
++        target: Classifier | None,
++    ) -> None:
++        """Play a group of episodes per sample, then improve the policy on them."""
++        model = self.model
++        episodes = play(
++            self.features,
++            self.positive,
++            np.repeat(samples, model.group_size),
++            (model.columns_, model.costs_),
++            (model.policy_, target or model.classifier_),
++            self.search,
++            model.max_steps,
++            self.rng,
++        )
++        final_states = model._states(  # pyright: ignore[reportPrivateUsage]  # its own model
++            self.features[episodes.samples], episodes.finals
++        )
++        labels: list[float] = self.positive[episodes.samples].tolist()
++        self.clf_examples.extend(zip(final_states, labels, strict=True))
++        self.clf_examples = self.clf_examples[-model.clf_replay :]
++        episode, step = np.nonzero(episodes.decided)
++        states = model._states(  # pyright: ignore[reportPrivateUsage]  # its own model
++            self.features[episodes.samples[episode]], episodes.masks[episode, step]
++        )
++        improve(
++            model.policy_,
++            optimisers[0],
++            states,
++            episodes,
++            advantages(episodes.returns, model.group_size),
++            (
++                model.min_queries,
++                model.clip_range,
++                model.group_epochs,
++                model.policy_batch,
++                model.grad_clip,
++            ),
++            self.shuffle,
++        )
++        self.updates += 1
++        if self.updates >= model.freeze_clf_updates:
++            self._train_classifier(optimisers[1])
++        if target is not None and self.updates % model.clf_target_update_every == 0:
++            target.load_state_dict(model.classifier_.state_dict())
++
+     def _episode(self, i: int, rollout_classifier: Classifier) -> None:
+         """Visit states of one sample, recording policy targets at each."""
+         model, n_slots = self.model, len(self.model.slot_names_)

@@ -1,0 +1,44 @@
+{
+ "dataset": "founders",
+ "regime": "R1",
+ "seed": 3,
+ "arm": "group",
+ "settings": {
+  "optimizer": "group",
+  "group_size": 32,
+  "group_batch": 2048,
+  "group_lr": 0.0016095943123274256,
+  "clip_range": 0.3,
+  "policy_batch": 256,
+  "grad_clip": 0.5,
+  "n_iterations": 1,
+  "group_epochs": 4
+ },
+ "test_ret": -1.4397497177124023,
+ "precision": 0.36,
+ "recall": 0.225,
+ "f05": 0.3214285714285714,
+ "called": 0.125,
+ "n_slots": 3.01,
+ "n_paths": 8,
+ "fit_seconds": 126.1869067080006,
+ "anchors": {
+  "static_set": [
+   0,
+   2,
+   4
+  ],
+  "static_train": -0.64166659116745,
+  "reveal_all_train": -0.7294444441795349,
+  "clairvoyant_train": 0.19513888657093048,
+  "random_train": -0.961786150932312,
+  "static_val": -0.9131247997283936,
+  "reveal_all_val": -1.113124966621399,
+  "clairvoyant_val": 0.09062501043081284,
+  "random_val": -1.339824914932251,
+  "static_test": -0.6437499523162842,
+  "reveal_all_test": -0.8025000095367432,
+  "clairvoyant_test": 0.22906248271465302,
+  "random_test": -1.0092593431472778
+ }
+}

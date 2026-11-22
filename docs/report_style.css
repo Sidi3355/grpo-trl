@@ -57,6 +57,8 @@ code { background: var(--accent-soft); padding: 0.08em 0.32em; border-radius: 3p
 table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
 th, td { text-align: left; padding: 0.42rem 0.7rem 0.42rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
 th { font: 500 0.74rem var(--font-data); letter-spacing: 0.04em; color: var(--ink-3); white-space: nowrap; }
+td:first-child { white-space: nowrap; }
+td.wrap { white-space: normal; }
 td.num, th.num { text-align: right; font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; padding-right: 0; padding-left: 0.7rem; }
 .verdict { font: 500 0.8rem var(--font-data); }
 .verdict.yes { color: var(--good); } .verdict.no { color: var(--bad); } .verdict.open { color: var(--flat); }

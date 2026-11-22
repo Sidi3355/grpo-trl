@@ -216,14 +216,33 @@ def main() -> None:
 
     if _exists("e5"):
         e5 = load_runs_e5()
-        analysis.save_table(e5, "e5_runs")
+        analysis.save_table(e5.drop(columns=["anchors", "settings"]), "e5_runs")
         summary = e5.groupby(["condition", "arm"], sort=False).agg(
             test_ret=("test_ret", "mean"), f05=("f05", "mean"), precision=("precision", "mean"),
             recall=("recall", "mean"), slots=("n_slots", "mean"), fit_seconds=("fit_seconds", "mean"),
             n=("seed", "nunique"),
         ).reset_index()
         analysis.save_table(summary, "e5_summary")
-        out += ["## E5. End to end through `VerifiableRL.fit` (classifier co-trained)", "", _md(summary), ""]
+        out += ["## E5. End to end through `VerifiableRL.fit` (classifier co-trained)", "",
+                "Shipped arms: three passes of rollouts. Group arms: one pass. Mean over seeds.", "", _md(summary), ""]
+        rows = []
+        for a, b in (("group", "shipped"), ("group", "shipped_tuned"), ("group_defaults", "shipped"),
+                     ("group_defaults", "shipped_tuned"), ("group_defaults", "group")):
+            for column, label in (("test_ret", "test return"), ("f05", "F0.5")):
+                wide = e5[e5["arm"].isin([a, b])].pivot_table(index=["condition", "seed"], columns="arm", values=column).dropna()
+                differences = {str(c): (g[a] - g[b]).to_numpy() for c, g in wide.groupby(level="condition", sort=False)}
+                row: dict[str, Any] = {"comparison": f"{a} - {b}", "metric": label}
+                for condition, d in differences.items():
+                    mean, low, high = stats.mean_ci(d)
+                    row[condition] = f"{mean:+.3f} [{low:+.3f}, {high:+.3f}]"
+                row["seeds won"] = f"{int(sum((d > 0).sum() for d in differences.values()))}/{int(sum(len(d) for d in differences.values()))}"
+                row["p (sign-flip, pooled raw)"] = stats.sign_flip_p(differences)
+                rows.append(row)
+        e5_pairs = pd.DataFrame(rows)
+        analysis.save_table(e5_pairs, "e5_pairwise")
+        out += ["### Paired differences per condition, mean [95% CI] over seeds", "", _md(e5_pairs), ""]
+        speed = e5.pivot_table(index="condition", columns="arm", values="fit_seconds", sort=False).reset_index()
+        out += ["### Seconds per fit", "", _md(speed, digits=0), ""]
 
     if _exists("e6"):
         records = [json.loads(p.read_text()) for p in sorted((RESULTS / "raw" / "e6").glob("*.json"))]
@@ -305,7 +324,9 @@ def load_runs_e5() -> pd.DataFrame:
     rows = [json.loads(p.read_text()) for p in sorted((RESULTS / "raw" / "e5").glob("*.json"))]
     frame = pd.DataFrame(rows)
     frame["condition"] = frame["dataset"] + "/" + frame["regime"]
-    return frame
+    order = {arm: i for i, arm in enumerate(("shipped", "shipped_tuned", "group", "group_defaults"))}
+    keys = pd.DataFrame({"c": frame["condition"], "a": frame["arm"].map(order), "s": frame["seed"]})
+    return frame.loc[keys.sort_values(["c", "a", "s"]).index].reset_index(drop=True)
 
 
 if __name__ == "__main__":

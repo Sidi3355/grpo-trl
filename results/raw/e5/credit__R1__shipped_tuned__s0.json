@@ -1,0 +1,45 @@
+{
+ "dataset": "credit",
+ "regime": "R1",
+ "seed": 0,
+ "arm": "shipped_tuned",
+ "settings": {
+  "policy_lr": 8.154883658323251e-05,
+  "n_rollouts": 10,
+  "max_depth": 4,
+  "tau_info": 0.3,
+  "tau_stop": 1.0,
+  "update_every": 10,
+  "train_epochs": 2,
+  "policy_batch": 64,
+  "eps": 0.3,
+  "n_iterations": 3
+ },
+ "test_ret": -1.118574857711792,
+ "precision": 0.5798319327731093,
+ "recall": 0.4683257918552036,
+ "f05": 0.553475935828877,
+ "called": 0.1785,
+ "n_slots": 3.032,
+ "n_paths": 69,
+ "fit_seconds": 233.16247914500127,
+ "anchors": {
+  "static_set": [
+   1,
+   2,
+   5
+  ],
+  "static_train": -1.0129997730255127,
+  "reveal_all_train": -1.7115000486373901,
+  "clairvoyant_train": 0.07170001417398453,
+  "random_train": -1.7586936950683594,
+  "static_val": -1.1014997959136963,
+  "reveal_all_val": -1.9524999856948853,
+  "clairvoyant_val": 0.004299976397305727,
+  "random_val": -2.0408248901367188,
+  "static_test": -0.920124888420105,
+  "reveal_all_test": -1.8116250038146973,
+  "clairvoyant_test": 0.03825000673532486,
+  "random_test": -1.835417628288269
+ }
+}

@@ -13,3 +13,20 @@ confirmatory runs are in `PLAN.md` section 13; this file lists them in one place
 | 6 | Before confirmatory runs (A2.2) | Tuning score normalised by anchors averaged over the three dev seeds; candidate sets are the union under both versions | One seed's tiny gap swamped the mean | No: applied to every method; candidate sets differed by one configuration |
 | 7 | Before confirmatory runs (A2.4) | 10 confirmatory seeds, not the 30 the plan's rule gives | The power target needs over 100 seeds; 30 would cost about four hours for E1 alone | Lowers power for every test equally; small differences are reported as unresolved |
 | 8 | Before confirmatory runs (A2.5) | E3 with 5 seeds, E4 with 3; Dr. GRPO arm added to E2; E6 added as exploratory | Compute; explanation of H4 | No |
+| 9 | After confirmatory runs (A3) | E1 not extended to 20 seeds | Compute went to E3, E5 and E4; decided on time alone, as A2.4 required | No |
+| 10 | Before E5 was run (A3) | E5 gained an arm: the patch's own defaults | To check the out-of-the-box behaviour of the proposed change | No |
+
+## Things that did not go as the plan expected
+
+These are results, not deviations, but a reader checking the plan against the report should find them here.
+
+- **H1 was reversed.** The plan predicted GRPO would beat PPO. PPO beat canonical GRPO by 0.50.
+- **H3 was reversed as registered.** The registered pair (canonical per-sample GRPO against a batch baseline)
+  confounds grouping with the per-group standard deviation; the batch baseline won by 0.85. With the standard
+  deviation removed from both, per-sample grouping is ahead by 0.10, which is not established.
+- **The plan's argument for a per-sample baseline (section 2.3) was right about direction and wrong about size.**
+  A per-sample mean did score above a critic that sees the label, which scored above an ordinary critic, but the
+  gaps are 0.06 and 0.13 and neither is significant.
+- **The plan's power target was unreachable** (deviation 7).
+- **Tuning made TRL's optimiser worse in R1** (0.72 as shipped, 0.61 tuned), because three of the four dev
+  conditions were R2. The report compares against the better TRL arm in each regime as well.

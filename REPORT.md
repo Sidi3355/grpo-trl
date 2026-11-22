@@ -281,7 +281,7 @@ what that does to the shortest and the longest episodes in a group (advantages s
 
 | | Shortest episodes | Longest episodes |
 |---|---|---|
-| True advantage, R1 (mean of six datasets) | +0.00 | +0.01 |
+| True advantage, R1 (mean of six datasets) | -0.01 | +0.01 |
 | Canonical GRPO's advantage, R1 | **+0.36** | **-1.32** |
 
 Under the default reward, stopping early or late is close to neutral in truth; canonical GRPO sees a strong
@@ -324,7 +324,21 @@ same settings (canonical GRPO's frozen configuration); only what the advantage i
 
 ### 4.5 Group size (E3)
 
-{{E3}}
+Each variant's frozen settings with only the group size changed, at a fixed number of episodes per update and the
+same compute budget (4 conditions x 5 seeds; pooled normalised test return [95% CI]).
+
+![Group size](results/figures/fig5_group_size.png)
+
+| Group size G | 2 | 4 | 8 | 16 | 32 |
+|---|---|---|---|---|---|
+| GRPO (mean-centred) | 1.11 [0.87, 1.33] | 1.25 [1.06, 1.43] | 1.20 [0.97, 1.42] | 1.11 [0.87, 1.33] | 1.24 [0.98, 1.47] |
+| GRPO (canonical) | -0.12 [-0.33, 0.10] | 0.22 [-0.02, 0.47] | 0.27 [-0.01, 0.57] | 0.45 [0.09, 0.82] | 0.31 [0.03, 0.59] |
+
+- **The mean-centred variant does not care about group size** between 2 and 32: two episodes per sample are
+  enough for a usable baseline. This is the opposite of the language-model setting, where large groups are
+  standard, and it agrees with de Oliveira et al.'s observation that small groups do no harm.
+- **Canonical GRPO is poor at every size and worst at G = 2,** where a z-score can only be +1 or -1 and every
+  trace of how much better one episode was is erased. No group size rescues it.
 
 ### 4.6 Four times the budget (E4)
 

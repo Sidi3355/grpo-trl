@@ -434,3 +434,18 @@ only, never on a result, and the confirmatory analysis is run on every seed comp
 
 **A2.6 One more sensitivity analysis.** Beside the pooled tests, the same comparisons over all twelve conditions
 with returns scaled by headroom instead of by the anchor gap (defined everywhere, no condition dropped).
+
+### A3 (2026-11-22, after the confirmatory runs: a closing note, nothing here changed an analysis)
+
+- **E1 was not extended to seeds 10 to 19.** A2.4 allowed the extension if compute remained after E2, E5 and E6.
+  It did not: the session's remaining compute went to E3, E5 and E4. The decision was made on time alone. The
+  confirmatory analysis is on seeds 0 to 9 as run.
+- **No condition was dropped by the degeneracy guard.** On the confirmatory seeds the smallest anchor gap was
+  `kickstarter` R2's, at 5.7% of its headroom, just above the 5% line. The all-conditions headroom analysis
+  (A2.6) shows what that one noisy scale does to the pooled numbers.
+- **E5 gained a fourth arm before it was run:** the patch's own defaults (`optimizer="group"` and nothing else),
+  to check what a user gets out of the box. The patch's defaults are the configuration frozen in A2.3.
+- **The matched-transitions sensitivity analysis is vacuous for mean-centred GRPO:** at equal compute PPO used
+  more transitions than it did, so reading GRPO "at PPO's transition count" reads its final checkpoint.
+- **H3 as registered confounds two things** (per-sample grouping and the per-group standard deviation). It is
+  reported as registered (reversed), with the pair that isolates grouping beside it, as A1.3 said it would be.

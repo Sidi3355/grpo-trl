@@ -1,0 +1,35 @@
+{
+ "dataset": "founders",
+ "regime": "R2",
+ "seed": 4,
+ "arm": "group_defaults",
+ "settings": {
+  "optimizer": "group"
+ },
+ "test_ret": 0.16565662622451782,
+ "precision": 0.26865671641791045,
+ "recall": 0.5625,
+ "f05": 0.3,
+ "called": 0.41875,
+ "n_slots": 2.0575,
+ "n_paths": 12,
+ "fit_seconds": 146.47562162099712,
+ "anchors": {
+  "static_set": [
+   0,
+   2
+  ],
+  "static_train": 0.28300347924232483,
+  "reveal_all_train": 0.07309029996395111,
+  "clairvoyant_train": 0.9788782596588135,
+  "random_train": 0.1299571692943573,
+  "static_val": 0.16703122854232788,
+  "reveal_all_val": 0.060937538743019104,
+  "clairvoyant_val": 0.9745644927024841,
+  "random_val": 0.08207851648330688,
+  "static_test": 0.17796872556209564,
+  "reveal_all_test": 0.051562532782554626,
+  "clairvoyant_test": 0.9747499227523804,
+  "random_test": 0.11791752278804779
+ }
+}

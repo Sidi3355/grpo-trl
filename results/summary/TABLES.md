@@ -376,6 +376,60 @@ Difference in (return - random) / (clairvoyant bound - random); no condition dro
 | grpo_nostd - grpo_loo      | R1+R2     | +1.005 [+0.819, +1.177] | 0.000 | 0.90 [0.80, 0.97] | 4/0/0                      |
 | grpo_batch - pg_nobaseline | R1+R2     | +0.130 [-0.035, +0.305] | 0.203 | 0.50 [0.36, 0.64] | 1/3/0                      |
 
+## E3. Group size: pooled normalised test return
+
+| base       |      2 |     4 |     8 |    16 |    32 |
+|:-----------|-------:|------:|------:|------:|------:|
+| grpo       | -0.119 | 0.218 | 0.269 | 0.449 | 0.306 |
+| grpo_nostd |  1.112 | 1.253 | 1.203 | 1.107 | 1.242 |
+
+## E5. End to end through `VerifiableRL.fit` (classifier co-trained)
+
+Shipped arms: three passes of rollouts. Group arms: one pass. Mean over seeds.
+
+| condition   | arm            |   test_ret |   f05 |   precision |   recall |   slots |   fit_seconds |   n |
+|:------------|:---------------|-----------:|------:|------------:|---------:|--------:|--------------:|----:|
+| credit/R1   | shipped        |     -0.995 | 0.558 |       0.598 |    0.442 |   3.014 |       100.551 |   5 |
+| credit/R1   | shipped_tuned  |     -1.384 | 0.532 |       0.544 |    0.493 |   3.072 |       237.246 |   5 |
+| credit/R1   | group          |     -1.067 | 0.555 |       0.588 |    0.457 |   3.018 |        32.425 |   5 |
+| credit/R1   | group_defaults |     -1.121 | 0.547 |       0.576 |    0.459 |   3.005 |        50.668 |   5 |
+| credit/R2   | shipped        |      0.304 | 0.451 |       0.437 |    0.548 |   1.000 |        61.469 |   5 |
+| credit/R2   | shipped_tuned  |      0.327 | 0.510 |       0.513 |    0.528 |   2.013 |       217.088 |   5 |
+| credit/R2   | group          |      0.338 | 0.514 |       0.523 |    0.492 |   1.120 |        19.991 |   5 |
+| credit/R2   | group_defaults |      0.342 | 0.502 |       0.499 |    0.524 |   1.369 |        31.276 |   5 |
+| founders/R1 | shipped        |     -1.667 | 0.327 |       0.362 |    0.260 |   3.019 |       296.615 |   5 |
+| founders/R1 | shipped_tuned  |     -2.473 | 0.369 |       0.361 |    0.423 |   3.220 |       775.886 |   5 |
+| founders/R1 | group          |     -1.069 | 0.349 |       0.444 |    0.202 |   3.034 |       131.152 |   5 |
+| founders/R1 | group_defaults |     -1.039 | 0.342 |       0.430 |    0.196 |   3.001 |       197.851 |   5 |
+| founders/R2 | shipped        |      0.156 | 0.285 |       0.252 |    0.649 |   1.000 |       179.682 |   5 |
+| founders/R2 | shipped_tuned  |      0.201 | 0.323 |       0.293 |    0.570 |   2.093 |       706.179 |   5 |
+| founders/R2 | group          |      0.240 | 0.361 |       0.333 |    0.541 |   2.802 |        99.961 |   5 |
+| founders/R2 | group_defaults |      0.193 | 0.327 |       0.300 |    0.513 |   2.306 |       150.771 |   5 |
+
+### Paired differences per condition, mean [95% CI] over seeds
+
+| comparison                     | metric      | credit/R1               | credit/R2               | founders/R1             | founders/R2             | seeds won   |   p (sign-flip, pooled raw) |
+|:-------------------------------|:------------|:------------------------|:------------------------|:------------------------|:------------------------|:------------|----------------------------:|
+| group - shipped                | test return | -0.072 [-0.229, +0.119] | +0.033 [-0.015, +0.112] | +0.598 [+0.277, +0.828] | +0.084 [+0.019, +0.141] | 12/20       |                       0.045 |
+| group - shipped                | F0.5        | -0.004 [-0.012, +0.004] | +0.064 [+0.027, +0.117] | +0.022 [+0.004, +0.041] | +0.076 [+0.043, +0.100] | 16/20       |                       0.001 |
+| group - shipped_tuned          | test return | +0.317 [+0.019, +0.659] | +0.011 [+0.003, +0.022] | +1.404 [+0.738, +2.029] | +0.039 [+0.007, +0.069] | 18/20       |                       0.001 |
+| group - shipped_tuned          | F0.5        | +0.023 [+0.001, +0.043] | +0.005 [-0.051, +0.056] | -0.020 [-0.058, +0.019] | +0.037 [+0.010, +0.065] | 14/20       |                       0.314 |
+| group_defaults - shipped       | test return | -0.126 [-0.217, -0.018] | +0.037 [-0.019, +0.136] | +0.628 [+0.244, +0.882] | +0.037 [-0.031, +0.106] | 10/20       |                       0.100 |
+| group_defaults - shipped       | F0.5        | -0.011 [-0.019, -0.004] | +0.051 [+0.001, +0.127] | +0.015 [-0.020, +0.055] | +0.042 [+0.005, +0.074] | 11/20       |                       0.060 |
+| group_defaults - shipped_tuned | test return | +0.263 [+0.029, +0.547] | +0.015 [-0.002, +0.036] | +1.434 [+0.836, +2.019] | -0.008 [-0.039, +0.015] | 14/20       |                       0.003 |
+| group_defaults - shipped_tuned | F0.5        | +0.015 [-0.001, +0.031] | -0.008 [-0.034, +0.018] | -0.027 [-0.061, +0.003] | +0.003 [-0.019, +0.027] | 12/20       |                       0.587 |
+| group_defaults - group         | test return | -0.054 [-0.135, +0.027] | +0.004 [-0.019, +0.027] | +0.030 [-0.072, +0.132] | -0.047 [-0.070, -0.018] | 8/20        |                       0.405 |
+| group_defaults - group         | F0.5        | -0.007 [-0.017, +0.001] | -0.013 [-0.044, +0.016] | -0.007 [-0.046, +0.041] | -0.034 [-0.057, -0.010] | 6/20        |                       0.074 |
+
+### Seconds per fit
+
+| condition   |   shipped |   shipped_tuned |   group |   group_defaults |
+|:------------|----------:|----------------:|--------:|-----------------:|
+| credit/R1   |       101 |             237 |      32 |               51 |
+| credit/R2   |        61 |             217 |      20 |               31 |
+| founders/R1 |       297 |             776 |     131 |              198 |
+| founders/R2 |       180 |             706 |     100 |              151 |
+
 ## E6. Direction of each advantage rule's update at the initial policy (exploratory)
 
 Cosine with the true policy gradient (per-sample mean baseline, no rescaling), mean over 3 seeds.

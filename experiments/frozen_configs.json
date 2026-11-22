@@ -83,10 +83,10 @@
   "group_batch": 2048,
   "group_lr": 0.0016095943123274256,
   "clip_range": 0.3,
-  "train_epochs": 4,
   "policy_batch": 256,
   "grad_clip": 0.5,
-  "n_iterations": 1
+  "n_iterations": 1,
+  "group_epochs": 4
  },
  "e5_shipped_n_iterations": 3
 }

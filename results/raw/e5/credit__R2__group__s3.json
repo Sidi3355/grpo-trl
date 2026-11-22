@@ -1,0 +1,43 @@
+{
+ "dataset": "credit",
+ "regime": "R2",
+ "seed": 3,
+ "arm": "group",
+ "settings": {
+  "optimizer": "group",
+  "group_size": 32,
+  "group_batch": 2048,
+  "group_lr": 0.0016095943123274256,
+  "clip_range": 0.3,
+  "policy_batch": 256,
+  "grad_clip": 0.5,
+  "n_iterations": 1,
+  "group_epochs": 4
+ },
+ "test_ret": 0.3436563313007355,
+ "precision": 0.544529262086514,
+ "recall": 0.4841628959276018,
+ "f05": 0.5312810327706058,
+ "called": 0.1965,
+ "n_slots": 1.102,
+ "n_paths": 3,
+ "fit_seconds": 19.25057329700212,
+ "anchors": {
+  "static_set": [
+   1,
+   4
+  ],
+  "static_train": 0.382628858089447,
+  "reveal_all_train": 0.22187764942646027,
+  "clairvoyant_train": 0.9196382164955139,
+  "random_train": 0.23971833288669586,
+  "static_val": 0.37884166836738586,
+  "reveal_all_val": 0.23123236000537872,
+  "clairvoyant_val": 0.9022009372711182,
+  "random_val": 0.2476460188627243,
+  "static_test": 0.34764960408210754,
+  "reveal_all_test": 0.19628500938415527,
+  "clairvoyant_test": 0.9071177840232849,
+  "random_test": 0.22646299004554749
+ }
+}

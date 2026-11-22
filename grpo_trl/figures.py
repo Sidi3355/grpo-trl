@@ -226,7 +226,7 @@ def group_size(frame: pd.DataFrame) -> Path:
     ax.set_xlabel("group size G (episodes per sample), at a fixed number of episodes per update")
     ax.set_ylabel("normalised test return")
     ax.set_title("Group size")
-    ax.legend(loc="lower left", fontsize=8)
+    ax.legend(loc="center right", fontsize=8)
     return _save(fig, "fig5_group_size")
 
 

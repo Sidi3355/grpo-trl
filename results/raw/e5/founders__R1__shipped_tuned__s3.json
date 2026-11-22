@@ -1,0 +1,45 @@
+{
+ "dataset": "founders",
+ "regime": "R1",
+ "seed": 3,
+ "arm": "shipped_tuned",
+ "settings": {
+  "policy_lr": 8.154883658323251e-05,
+  "n_rollouts": 10,
+  "max_depth": 4,
+  "tau_info": 0.3,
+  "tau_stop": 1.0,
+  "update_every": 10,
+  "train_epochs": 2,
+  "policy_batch": 64,
+  "eps": 0.3,
+  "n_iterations": 3
+ },
+ "test_ret": -1.5271246433258057,
+ "precision": 0.42857142857142855,
+ "recall": 0.3375,
+ "f05": 0.40662650602409633,
+ "called": 0.1575,
+ "n_slots": 3.24,
+ "n_paths": 75,
+ "fit_seconds": 771.1232455739992,
+ "anchors": {
+  "static_set": [
+   0,
+   2,
+   4
+  ],
+  "static_train": -0.64166659116745,
+  "reveal_all_train": -0.7294444441795349,
+  "clairvoyant_train": 0.19513888657093048,
+  "random_train": -0.961786150932312,
+  "static_val": -0.9131247997283936,
+  "reveal_all_val": -1.113124966621399,
+  "clairvoyant_val": 0.09062501043081284,
+  "random_val": -1.339824914932251,
+  "static_test": -0.6437499523162842,
+  "reveal_all_test": -0.8025000095367432,
+  "clairvoyant_test": 0.22906248271465302,
+  "random_test": -1.0092593431472778
+ }
+}

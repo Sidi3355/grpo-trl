@@ -11,6 +11,7 @@ Arms:
     shipped_tuned   the rollout optimiser with the settings tuned in this study, three passes
     group           ``optimizer="group"`` with the settings frozen for mean-centred GRPO,
                     one pass (about the compute of three default rollout passes, or less)
+    group_defaults  ``optimizer="group"`` and nothing else: what a user gets out of the box
 The classifier is pretrained with the dataset's selected ``_pretrain`` settings
 and then co-trained with TRL's defaults in every arm.
 """
@@ -37,6 +38,7 @@ def arms() -> dict[str, dict[str, Any]]:
         "shipped": {**passes},
         "shipped_tuned": {**tuned, **passes, "_frac": frozen["arms"]["mc_tuned"][1].get("min_queries_frac")},
         "group": {"optimizer": "group", **frozen["e5_group"]},
+        "group_defaults": {"optimizer": "group"},  # the patch's own defaults, nothing else set
     }
 
 
