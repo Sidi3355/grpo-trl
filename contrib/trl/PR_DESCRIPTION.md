@@ -35,7 +35,10 @@ deployment code; equal compute counted on every network; equal tuning effort):
   rewards alone, +0.46 [+0.35, +0.56].
 - At equal compute it finishes in about half the wall-clock time.
 - Runs ending below a random policy: 8% against 21%.
-- {{E5_SENTENCE}}
+- End to end through `fit`, with the classifier co-trained as the library does (two datasets, both reward
+  regimes, five seeds): one pass of `group` against **three** passes of `rollout` wins 12 of 20 paired seeds on
+  test return (clearly ahead on one dataset, level on the other), raises F0.5 in 16 of 20, and takes a third to
+  a half of the time.
 
 Two things the study found that are worth saying plainly:
 

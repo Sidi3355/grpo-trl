@@ -1,1 +1,18 @@
-<p>[results pending]</p>
+<h3>Through the real <code>fit</code>, with the classifier co-trained</h3>
+<p>The main experiment froze the classifier so that only the optimiser varied. TRL does not: it co-trains the classifier on the states the policy reaches. So the proposed patch was run through the public API on two datasets and both regimes, five seeds each. The shipped optimiser was given <strong>three</strong> passes; the group optimiser, <strong>one</strong>.</p>
+<div class="figure"><div class="scroll"><table>
+  <thead><tr><th>Condition</th><th class="num">Shipped, 3 passes</th><th class="num">Group, 1 pass</th><th class="num">Paired difference (95% CI)</th><th class="num">Fit time</th></tr></thead>
+  <tbody>
+    <tr><td>founders, R1</td><td class="num">&minus;1.67</td><td class="num">&minus;1.07</td><td class="num">+0.60 (+0.28 to +0.83)</td><td class="num">297 s &rarr; 131 s</td></tr>
+    <tr><td>founders, R2</td><td class="num">0.156</td><td class="num">0.240</td><td class="num">+0.08 (+0.02 to +0.14)</td><td class="num">180 s &rarr; 100 s</td></tr>
+    <tr><td>credit, R1</td><td class="num">&minus;1.00</td><td class="num">&minus;1.07</td><td class="num">&minus;0.07 (&minus;0.23 to +0.12)</td><td class="num">101 s &rarr; 32 s</td></tr>
+    <tr><td>credit, R2</td><td class="num">0.304</td><td class="num">0.338</td><td class="num">+0.03 (&minus;0.02 to +0.11)</td><td class="num">61 s &rarr; 20 s</td></tr>
+  </tbody>
+</table></div>
+<div class="cap">Mean test return over five seeds. The group optimiser wins 12 of 20 paired seeds on return and 16 of 20 on F0.5; against the tuned rollout settings it wins 18 of 20 on return.</div></div>
+<p>The conclusion survives co-training, with a smaller margin: clearly ahead on founders, level on credit, never clearly behind, in a third to a half of the time. With the patch's untouched defaults it is a little weaker, and slightly behind the shipped optimiser on credit in R1; the documentation says which two shared settings to change.</p>
+
+<h3>Group size</h3>
+<p>Mean-centred GRPO scores between 1.11 and 1.25 for every group size from 2 to 32: two episodes per sample already give a usable baseline. Canonical GRPO is poor at every size and worst at two, where a z-score can only be +1 or &minus;1.</p>
+
+{{E4_BLOCK}}

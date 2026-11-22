@@ -36,7 +36,11 @@ def arms() -> dict[str, dict[str, Any]]:
     passes = {"n_iterations": frozen["e5_shipped_n_iterations"]}
     return {
         "shipped": {**passes},
-        "shipped_tuned": {**tuned, **passes, "_frac": frozen["arms"]["mc_tuned"][1].get("min_queries_frac")},
+        "shipped_tuned": {
+            **tuned,
+            **passes,
+            "_frac": frozen["arms"]["mc_tuned"][1].get("min_queries_frac"),
+        },
         "group": {"optimizer": "group", **frozen["e5_group"]},
         "group_defaults": {"optimizer": "group"},  # the patch's own defaults, nothing else set
     }
@@ -70,7 +74,9 @@ def run(job: tuple[str, str, int, str]) -> str:
     model.fit(problem.train.x.numpy(), labels)
     seconds = time.perf_counter() - start
     masks, paths = model._reveal(problem.test.x.numpy(), None)
-    returns, proba = returns_of_masks(model.classifier_, problem.test, torch.from_numpy(masks), problem)
+    returns, _proba = returns_of_masks(
+        model.classifier_, problem.test, torch.from_numpy(masks), problem
+    )
     predicted = model.predict(problem.test.x.numpy()) == "yes"
     truth = problem.test.y.numpy() > 0.5
     tp, fp, fn = (predicted & truth).sum(), (predicted & ~truth).sum(), (~predicted & truth).sum()
@@ -78,10 +84,19 @@ def run(job: tuple[str, str, int, str]) -> str:
     recall = float(tp / (tp + fn)) if tp + fn else 0.0
     f05 = 1.25 * precision * recall / (0.25 * precision + recall) if precision + recall else 0.0
     record = {
-        "dataset": dataset, "regime": regime, "seed": seed, "arm": arm, "settings": settings,
-        "test_ret": float(returns.mean()), "precision": precision, "recall": recall, "f05": f05,
-        "called": float(predicted.mean()), "n_slots": float(masks.sum(axis=1).mean()),
-        "n_paths": len({tuple(p) for p in paths}), "fit_seconds": seconds,
+        "dataset": dataset,
+        "regime": regime,
+        "seed": seed,
+        "arm": arm,
+        "settings": settings,
+        "test_ret": float(returns.mean()),
+        "precision": precision,
+        "recall": recall,
+        "f05": f05,
+        "called": float(predicted.mean()),
+        "n_slots": float(masks.sum(axis=1).mean()),
+        "n_paths": len({tuple(p) for p in paths}),
+        "fit_seconds": seconds,
         "anchors": problem.info["anchors"],
     }
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -99,8 +99,6 @@ def train_mc(
     meter.attach("policy", model.policy_)
     meter.attach("classifier", model.classifier_)
     rng = np.random.default_rng(problem.seed + 104729)
-    trainer = BudgetedTrainer(
-        model, problem.train.x.numpy(), problem.train.y.numpy(), None, rng
-    )
+    trainer = BudgetedTrainer(model, problem.train.x.numpy(), problem.train.y.numpy(), None, rng)
     trainer.run_budgeted(meter, lambda: after_update(model))
     return model

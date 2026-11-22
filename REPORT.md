@@ -56,7 +56,7 @@ in [`contrib/trl`](contrib/trl/README.md); it passes TRL's lint, strict type-che
 
 **What this study cannot say.** Ten seeds resolve differences of about 0.17 or more; the 0.09 between PPO and
 mean-centred GRPO is at the edge of that. The classifier was frozen in the main experiment (the end-to-end check
-in section 4.8 relaxes this). The founder data is generated, and VCBench was not available, so nothing here is a
+in section 4.7 relaxes this). The founder data is generated, and VCBench was not available, so nothing here is a
 claim about real founders.
 
 ---
@@ -125,7 +125,7 @@ Only the policy optimiser varies. Details and code pointers are in [`docs/METHOD
   seeds, one frozen configuration per learner for all datasets and regimes. The incumbent got the same search,
   plus the right to set its own `min_queries`.
 - **Frozen classifier.** The reward depends on the classifier, so in the main experiment it is trained once per
-  (dataset, seed) by TRL's own pretraining and frozen for every arm. Section 4.8 removes this.
+  (dataset, seed) by TRL's own pretraining and frozen for every arm. Section 4.7 removes this.
 - **Statistics.** Runs are paired by seed. Each confirmatory test is the mean paired difference in normalised
   test return, pooled over conditions with equal weight: stratified bootstrap CI, sign-flip permutation p,
   Holm correction over eight tests.
@@ -185,7 +185,7 @@ What the table shows:
 ![Learning curves](results/figures/fig3_learning_curves.png)
 
 The policy-gradient arms reach the level of the best fixed slot set within a quarter of the budget in R1. TRL's
-default optimiser is still climbing when the budget ends; section 4.7 gives it four times as much.
+default optimiser is still climbing when the budget ends; section 4.6 gives it four times as much.
 
 ### 4.2 The confirmatory tests
 
@@ -346,7 +346,54 @@ same compute budget (4 conditions x 5 seeds; pooled normalised test return [95% 
 
 ### 4.7 End to end, with the classifier co-trained (E5)
 
-{{E5}}
+The main experiment froze the classifier so that only the optimiser varied. TRL does not: it co-trains the
+classifier on the states the policy reaches. This experiment drops the restriction and goes through the public
+API only (`VerifiableRL(...).fit`, `predict`, `decision_paths`), on the patched library. Two datasets, both
+regimes, five seeds, 80 fits.
+
+- *shipped*: the library's defaults, **three** passes of rollouts.
+- *shipped (tuned)*: the tuned rollout settings, three passes.
+- *group*: `optimizer="group"` with the settings frozen for mean-centred GRPO, **one** pass.
+- *group (defaults)*: `optimizer="group"` and nothing else: what a user gets out of the box.
+
+| Condition | | shipped | shipped (tuned) | group | group (defaults) |
+|---|---|---|---|---|---|
+| founders, R1 | test return | -1.67 | -2.47 | **-1.07** | -1.04 |
+| | F0.5 | 0.33 | 0.37 | 0.35 | 0.34 |
+| | seconds per fit | 297 | 776 | 131 | 198 |
+| founders, R2 | test return | 0.156 | 0.201 | **0.240** | 0.193 |
+| | F0.5 | 0.29 | 0.32 | 0.36 | 0.33 |
+| | seconds per fit | 180 | 706 | 100 | 151 |
+| credit, R1 | test return | **-1.00** | -1.38 | -1.07 | -1.12 |
+| | F0.5 | 0.56 | 0.53 | 0.56 | 0.55 |
+| | seconds per fit | 101 | 237 | 32 | 51 |
+| credit, R2 | test return | 0.304 | 0.327 | **0.338** | 0.342 |
+| | F0.5 | 0.45 | 0.51 | 0.51 | 0.50 |
+| | seconds per fit | 61 | 217 | 20 | 31 |
+
+Paired by seed, *group* minus *shipped*, mean [95% CI over five seeds]:
+
+| | founders, R1 | founders, R2 | credit, R1 | credit, R2 | Seeds won | Pooled p |
+|---|---|---|---|---|---|---|
+| Test return | +0.60 [+0.28, +0.83] | +0.08 [+0.02, +0.14] | -0.07 [-0.23, +0.12] | +0.03 [-0.02, +0.11] | 12 of 20 | 0.045 |
+| F0.5 | +0.02 [0.00, +0.04] | +0.08 [+0.04, +0.10] | 0.00 [-0.01, 0.00] | +0.06 [+0.03, +0.12] | 16 of 20 | 0.001 |
+
+- **The conclusion survives co-training, with a smaller margin.** The group optimiser is clearly ahead on
+  founders in both regimes, level on credit, and never clearly behind, while the shipped optimiser had three
+  passes and took two to three times as long. Against the tuned rollout settings it wins 18 of 20 paired seeds
+  (p = 0.001).
+- **It is faster.** One pass of the group optimiser takes about as long as one of the shipped optimiser's three
+  passes.
+- **Prediction quality goes the same way as the return here:** F0.5 is higher in three conditions of four and
+  unchanged in the fourth.
+- **Out of the box it is a little weaker than with the study's settings.** The patch's defaults share
+  `policy_batch` (128) and `grad_clip` (5.0) with the rollout optimiser, where the study used 256 and 0.5. The
+  difference is not significant overall (8 of 20 seeds, p = 0.41) but shows on founders in R2 (-0.05) and it is
+  enough to put the defaults slightly behind the shipped optimiser on credit in R1 (-0.13 [-0.22, -0.02]). The
+  patch's documentation says to set both.
+- **This experiment is small:** five seeds, two datasets, no PPO arm (the patch has no critic), and wide
+  intervals. It is a check that the main result is not an artefact of freezing the classifier, not a second
+  confirmatory test.
 
 ## 5. Discussion
 

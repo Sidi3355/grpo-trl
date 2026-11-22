@@ -69,14 +69,23 @@ def _frame() -> pd.DataFrame:
         for seed in range(10):
             for arm, level in (("good", 1.2), ("bad", 0.4)):
                 noise = rng.normal(0, 0.02)
-                rows.append({
-                    "condition": condition, "dataset": dataset, "regime": regime, "arm": arm,
-                    "seed": seed, "prevalence": 0.25, "ba_all_val": 0.8,
-                    "test_ret": random + (level + noise) * (static - random),
-                    "test_ret_valbest": random + level * (static - random),
-                    "anchor_random_test": random, "anchor_static_test": static,
-                    "anchor_reveal_all_test": random, "anchor_clairvoyant_test": static + 1,
-                })
+                rows.append(
+                    {
+                        "condition": condition,
+                        "dataset": dataset,
+                        "regime": regime,
+                        "arm": arm,
+                        "seed": seed,
+                        "prevalence": 0.25,
+                        "ba_all_val": 0.8,
+                        "test_ret": random + (level + noise) * (static - random),
+                        "test_ret_valbest": random + level * (static - random),
+                        "anchor_random_test": random,
+                        "anchor_static_test": static,
+                        "anchor_reveal_all_test": random,
+                        "anchor_clairvoyant_test": static + 1,
+                    }
+                )
     return pd.DataFrame(rows)
 
 

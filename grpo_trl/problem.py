@@ -188,9 +188,7 @@ def allowed_actions(masks: torch.Tensor, min_queries: int) -> torch.Tensor:
     return torch.cat([~masks, (masks.sum(dim=1) >= min_queries)[:, None]], dim=1)
 
 
-def terminal_rewards(
-    logits: torch.Tensor, labels: torch.Tensor, regime: Regime
-) -> torch.Tensor:
+def terminal_rewards(logits: torch.Tensor, labels: torch.Tensor, regime: Regime) -> torch.Tensor:
     """TRL's ``rewards``: the classifier's call scored against the label."""
     called = torch.sigmoid(logits) >= regime.reward_threshold
     positive = labels > 0.5
@@ -272,9 +270,7 @@ def sample_episodes(
         active[live[done]] = False
     final = terminal_rewards(classifier(x * mask[:, columns]), y, regime)
     rewards[torch.arange(b), last] += final
-    return Episodes(
-        rows, masks, actions, logp, logp_all, valid, rewards, rewards.sum(dim=1), mask
-    )
+    return Episodes(rows, masks, actions, logp, logp_all, valid, rewards, rewards.sum(dim=1), mask)
 
 
 def returns_of_masks(
@@ -378,7 +374,13 @@ def anchors(problem: Problem, classifier: Classifier, n_random: int = 20) -> dic
         out[f"clairvoyant_{name}"] = float(table.max(dim=0).values.mean())
         rows = torch.arange(len(split)).repeat(n_random)
         episodes = sample_episodes(
-            None, classifier, split, rows, problem, generator, uniform=True  # type: ignore[arg-type]
+            None,
+            classifier,
+            split,
+            rows,
+            problem,
+            generator,
+            uniform=True,  # type: ignore[arg-type]
         )
         out[f"random_{name}"] = float(episodes.returns.mean())
     return out

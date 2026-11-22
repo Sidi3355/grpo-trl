@@ -46,8 +46,11 @@ def run_job(job: dict[str, Any]) -> str:
     budget = json.loads(BUDGETS.read_text())[job["dataset"]][job["regime"]]["compute"]
     record = run_arm(problem, job["kind"], job["settings"], budget * job.get("budget_mult", 1.0))
     record.update(
-        exp=job["exp"], arm_name=job["arm_name"], regime_name=job["regime"],
-        budget_mult=job.get("budget_mult", 1.0), initial=initial_record(problem),
+        exp=job["exp"],
+        arm_name=job["arm_name"],
+        regime_name=job["regime"],
+        budget_mult=job.get("budget_mult", 1.0),
+        initial=initial_record(problem),
         wall_total=time.time() - start,
     )
     save(record, out)
@@ -90,8 +93,13 @@ def budget_job(key: tuple[str, str, int]) -> dict[str, Any]:
     start = time.time()
     train_mc(problem, {}, meter, after)
     return {
-        "dataset": dataset, "regime": regime, "seed": seed, "compute": meter.compute,
-        "transitions": meter.transitions, "episodes": meter.episodes, "wall": time.time() - start,
+        "dataset": dataset,
+        "regime": regime,
+        "seed": seed,
+        "compute": meter.compute,
+        "transitions": meter.transitions,
+        "episodes": meter.episodes,
+        "wall": time.time() - start,
     }
 
 
@@ -104,10 +112,18 @@ def _pool(function: Any, jobs: list[Any], workers: int) -> list[Any]:
     return results
 
 
-def _job(exp: str, dataset: str, regime: str, seed: int, arm_name: str, arm: Any, **extra: Any) -> dict[str, Any]:
+def _job(
+    exp: str, dataset: str, regime: str, seed: int, arm_name: str, arm: Any, **extra: Any
+) -> dict[str, Any]:
     return {
-        "exp": exp, "dataset": dataset, "regime": regime, "seed": seed,
-        "arm_name": arm_name, "kind": arm[0], "settings": arm[1], **extra,
+        "exp": exp,
+        "dataset": dataset,
+        "regime": regime,
+        "seed": seed,
+        "arm_name": arm_name,
+        "kind": arm[0],
+        "settings": arm[1],
+        **extra,
     }
 
 
@@ -119,7 +135,16 @@ def jobs_for(stage: str, args: argparse.Namespace) -> list[dict[str, Any]]:
         for method in ("mc", "ppo", "grpo", "grpo_nostd"):
             for index, arm in enumerate(configs.search_configs(method, N_SEARCH)):
                 for dataset, regime in configs.DEV_CONDITIONS:
-                    jobs.append(_job("tune", dataset, regime, configs.DEV_SEEDS[0], f"{method}-{index:02d}", arm))
+                    jobs.append(
+                        _job(
+                            "tune",
+                            dataset,
+                            regime,
+                            configs.DEV_SEEDS[0],
+                            f"{method}-{index:02d}",
+                            arm,
+                        )
+                    )
     elif stage == "tune2":
         top = json.loads((HERE / "tune_top3.json").read_text())
         for method, indices in top.items():
@@ -127,7 +152,16 @@ def jobs_for(stage: str, args: argparse.Namespace) -> list[dict[str, Any]]:
             for index in indices:
                 for dataset, regime in configs.DEV_CONDITIONS:
                     for seed in configs.DEV_SEEDS[1:]:
-                        jobs.append(_job("tune", dataset, regime, seed, f"{method}-{index:02d}", searched[index]))
+                        jobs.append(
+                            _job(
+                                "tune",
+                                dataset,
+                                regime,
+                                seed,
+                                f"{method}-{index:02d}",
+                                searched[index],
+                            )
+                        )
     else:
         frozen = json.loads(FROZEN.read_text())
         arms = {name: (kind, settings) for name, (kind, settings) in frozen["arms"].items()}
@@ -151,13 +185,28 @@ def jobs_for(stage: str, args: argparse.Namespace) -> list[dict[str, Any]]:
                     for base in ("grpo", "grpo_nostd"):
                         for size in (2, 4, 8, 16, 32):
                             settings = {**arms[base][1], "group_size": size}
-                            jobs.append(_job("e3", dataset, regime, seed, f"{base}_G{size}", ("pg", settings)))
+                            jobs.append(
+                                _job(
+                                    "e3", dataset, regime, seed, f"{base}_G{size}", ("pg", settings)
+                                )
+                            )
         elif stage == "e4":
             for dataset in ("synth-route", "founders"):
                 for regime in configs.REGIMES:
                     for seed in range(3):  # Amendment A2.5
                         for name in ("mc_default", "mc_tuned", "ppo", "grpo", "grpo_nostd"):
-                            jobs.append(_job("e4", dataset, regime, seed, name, arms[name], budget_mult=4.0))
+                            jobs.append(
+                                _job("e4", dataset, regime, seed, name, arms[name], budget_mult=4.0)
+                            )
+        elif stage == "e7":  # post hoc (Amendment A4): a scale that does not shrink as the policy converges
+            arm = ("pg", {**arms["grpo_nostd"][1], "advantage": "group_rawscale"})
+            for seed in range(3):
+                for dataset in ("synth-route", "founders"):
+                    for regime in configs.REGIMES:
+                        jobs.append(_job("e7x4", dataset, regime, seed, "grpo_rawscale", arm, budget_mult=4.0))
+                for dataset in configs.DATASETS:
+                    for regime in configs.REGIMES:
+                        jobs.append(_job("e7x1", dataset, regime, seed, "grpo_rawscale", arm))
         else:
             raise SystemExit(f"unknown stage {stage}")
     return [job for job in jobs if not _path(job).exists()]
@@ -176,7 +225,12 @@ def main() -> None:
         _pool(prepare_job, [(d, s) for s in args.seeds for d in configs.DATASETS], args.workers)
         return
     if args.stage == "budget":
-        keys = [(d, r, s) for d in configs.DATASETS for r in configs.REGIMES for s in configs.DEV_SEEDS[:2]]
+        keys = [
+            (d, r, s)
+            for d in configs.DATASETS
+            for r in configs.REGIMES
+            for s in configs.DEV_SEEDS[:2]
+        ]
         rows = _pool(budget_job, keys, args.workers)
         table: dict[str, dict[str, dict[str, float]]] = {}
         for dataset in configs.DATASETS:

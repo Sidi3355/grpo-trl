@@ -42,11 +42,16 @@ def dev_anchors() -> pd.DataFrame:
         rows = []
         for dataset, regime in configs.DEV_CONDITIONS:
             found = [build_problem(dataset, s, regime).info["anchors"] for s in configs.DEV_SEEDS]
-            rows.append({
-                "condition": f"{dataset}/{regime}",
-                **{k: float(np.mean([a[f"{k}_val"] for a in found])) for k in ("random", "static", "clairvoyant")},
-                "per_seed_gap": [a["static_val"] - a["random_val"] for a in found],
-            })
+            rows.append(
+                {
+                    "condition": f"{dataset}/{regime}",
+                    **{
+                        k: float(np.mean([a[f"{k}_val"] for a in found]))
+                        for k in ("random", "static", "clairvoyant")
+                    },
+                    "per_seed_gap": [a["static_val"] - a["random_val"] for a in found],
+                }
+            )
         path.write_text(json.dumps(rows, indent=1))
     table = pd.DataFrame(json.loads(path.read_text())).set_index("condition")
     table["gap"] = table["static"] - table["random"]
@@ -59,7 +64,9 @@ def scores(seeds: tuple[int, ...]) -> pd.DataFrame:
     frame = load_runs("tune")
     frame = frame[frame["seed"].isin(seeds)].copy()
     frame = frame[~frame["condition"].map(anchors["degenerate"])]
-    frame["score"] = (frame["val_ret"] - frame["condition"].map(anchors["random"])) / frame["condition"].map(anchors["gap"])
+    frame["score"] = (frame["val_ret"] - frame["condition"].map(anchors["random"])) / frame[
+        "condition"
+    ].map(anchors["gap"])
     frame["score_seed_anchors"] = (frame["val_ret"] - frame["anchor_random_val"]) / (
         frame["anchor_static_val"] - frame["anchor_random_val"]
     )
@@ -86,8 +93,12 @@ def main(stage: str) -> None:
         top = {}
         for method in METHODS:
             mine = ranked[ranked["method"] == method]
-            best = set(mine.nlargest(3, "mean")["index"]) | set(mine.nlargest(3, "mean_seed_anchors")["index"])
-            print(f"\n{method}\n{mine.sort_values('mean', ascending=False).head(6).round(3).to_string(index=False)}")
+            best = set(mine.nlargest(3, "mean")["index"]) | set(
+                mine.nlargest(3, "mean_seed_anchors")["index"]
+            )
+            print(
+                f"\n{method}\n{mine.sort_values('mean', ascending=False).head(6).round(3).to_string(index=False)}"
+            )
             top[method] = sorted(int(i) for i in best)
         (HERE / "tune_top3.json").write_text(json.dumps(top, indent=1))
         print(top)
@@ -102,8 +113,12 @@ def main(stage: str) -> None:
         rows.append(ranked)
         index = int(ranked["index"].iloc[0])
         kind, settings = configs.search_configs(method, 24)[index]
-        chosen[method] = {"index": index, "kind": kind, "settings": settings,
-                          "dev_score": float(ranked["mean"].iloc[0])}
+        chosen[method] = {
+            "index": index,
+            "kind": kind,
+            "settings": settings,
+            "dev_score": float(ranked["mean"].iloc[0]),
+        }
     pd.concat(rows).to_csv(HERE / "tune_finalists.csv", index=False)
     (HERE / "tune_chosen.json").write_text(json.dumps(chosen, indent=1))
     print(json.dumps(chosen, indent=1))

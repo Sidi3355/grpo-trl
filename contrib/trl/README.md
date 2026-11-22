@@ -6,7 +6,7 @@ existing ones, a changelog entry.
 
 | File | What |
 |---|---|
-| [`verifiable-rl-group-optimizer.patch`](verifiable-rl-group-optimizer.patch) | The whole change, against `Vela-Research/think-reason-learn` at `a712645` (v0.4.4): 5 files, 432 added lines, 4 changed |
+| [`verifiable-rl-group-optimizer.patch`](verifiable-rl-group-optimizer.patch) | The whole change, against `Vela-Research/think-reason-learn` at `a712645` (v0.4.4): 5 files, 433 added lines, 4 changed |
 | [`_group.py`](_group.py) | The new module, for reading without applying the patch |
 | [`PR_DESCRIPTION.md`](PR_DESCRIPTION.md) | The pull-request text, in TRL's template |
 
@@ -31,6 +31,9 @@ model = VerifiableRL(slots={"education": 384, "jobs": 384}, optimizer="group")
   `group_lr` (1.5e-3), `clip_range` (0.3). The defaults are the configuration frozen in this study before the
   confirmatory runs. `policy_batch`, `grad_clip`, `n_iterations`, `min_queries`, `max_steps`, the rewards and the
   classifier settings are shared with the rollout optimiser.
+- **Two shared settings are worth changing with it.** The study's configuration used `policy_batch=256` and
+  `grad_clip=0.5`; the library's defaults for those (128 and 5.0) belong to the rollout optimiser and are left
+  alone. With them untouched the new optimiser is a little weaker (report section 4.7). The docstring says so.
 - The LLM supervisor advises only at prediction time under `optimizer="group"` (training samples its actions
   from the policy itself).
 - No new dependency. Saving, loading, pickling, `clone` and the supervisor are unaffected.
@@ -45,7 +48,7 @@ In a clone of the upstream repository at `a712645`, with the environment built f
 | `poetry run ruff check .` | passes |
 | `poetry run ruff format --check .` | passes |
 | `poetry run pyright` (strict) | 0 errors |
-| `poetry run pytest` (offline suite) | {{PYTEST}} |
+| `poetry run pytest` (offline suite) | 494 passed, 2 skipped |
 
 Seven tests are added to `tests/verifiable_rl/test_verifiable_rl.py`:
 

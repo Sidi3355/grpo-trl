@@ -449,3 +449,28 @@ with returns scaled by headroom instead of by the anchor gap (defined everywhere
   more transitions than it did, so reading GRPO "at PPO's transition count" reads its final checkpoint.
 - **H3 as registered confounds two things** (per-sample grouping and the per-group standard deviation). It is
   reported as registered (reversed), with the pair that isolates grouping beside it, as A1.3 said it would be.
+
+### A4 (2026-11-22, post hoc: written while E4 was still running, after its first seed had been read)
+
+**What prompted it.** The first seed of E4 (four times the budget) showed mean-centred GRPO reaching its best
+score and then dropping sharply late in training on three of four conditions (for example synthetic routing, R2:
+2.49 at 60% of the budget, 1.35 at 80%), while PPO held steady. Nothing like it appears within the one-times
+budget of E1.
+
+**Hypothesis.** The mean-centred variant divides the centred returns by their standard deviation over the batch
+(A1.4). As the policy becomes nearly deterministic, the episodes of a group nearly agree, the centred returns go
+to zero, and so does that standard deviation. The normalised advantages keep unit variance all the same: the
+step size never shrinks, and the last few disagreements are scaled up without limit. It is the per-group
+problem of canonical GRPO again, one level up, and it bites only near convergence.
+
+**E7 (post hoc, exploratory; no test from it enters the confirmatory family).** One more arm, `group_rawscale`:
+the centred returns divided by the batch standard deviation of the *returns* themselves, which measures the
+reward's scale and does not shrink as the policy converges. Everything else is mean-centred GRPO's frozen
+configuration; nothing is re-tuned. Run (a) at four times the budget on E4's four conditions and three seeds, to
+see whether the late drop goes away, and (b) at one times the budget on all twelve conditions for the same three
+seeds, to see what the change costs or gains where E1 was run. Compared with mean-centred GRPO and PPO on the
+same seeds.
+
+**How it will be reported.** As a diagnosis and a candidate fix found after the confirmatory runs, on three
+seeds. If it removes the drop without losing ground at one times the budget, the proposed patch will use it and
+say so; the confirmatory results about mean-centred GRPO stay as they are.

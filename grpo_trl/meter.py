@@ -9,12 +9,12 @@ a network, library code included, is charged the same way.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Iterator
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 TRAIN_ROW_FACTOR = 3.0
 

@@ -1,0 +1,7 @@
+comparison,regimes,difference,p,P(improvement),conditions won/tied/lost
+GRPO (mean-centred) - TRL shipped (defaults),R1+R2,"+0.251 [+0.251, +0.251]",0.875012498750125,"0.50 [0.50, 0.50]",2/0/2
+GRPO (mean-centred) - TRL shipped (tuned),R1+R2,"-0.096 [-0.096, -0.096]",0.8761123887611239,"0.50 [0.50, 0.50]",2/0/2
+PPO - TRL shipped (defaults),R1+R2,"+0.861 [+0.861, +0.861]",0.125987401259874,"1.00 [1.00, 1.00]",4/0/0
+PPO - TRL shipped (tuned),R1+R2,"+0.514 [+0.514, +0.514]",0.24887511248875113,"0.75 [0.75, 0.75]",3/0/1
+GRPO (mean-centred) - PPO,R1+R2,"-0.610 [-0.610, -0.610]",0.24887511248875113,"0.25 [0.25, 0.25]",1/0/3
+GRPO (canonical) - PPO,R1+R2,"-0.612 [-0.612, -0.612]",1.0,"0.75 [0.75, 0.75]",3/0/1

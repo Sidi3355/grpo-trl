@@ -221,9 +221,7 @@ def build_founders() -> Pool:
     """The 3,000 generated founder profiles of ``Sidi3355/trl-for-angels``."""
     rows = [json.loads(line) for line in (RAW / "founders.jsonl").open()]
     outcome = [re.sub(r"\s+", " ", r["output"].split("\n")[0]).lower() for r in rows]
-    y = np.array(
-        [int(("$500m-$1b" in o) or ("over $1b" in o)) for o in outcome], dtype=np.int64
-    )
+    y = np.array([int(("$500m-$1b" in o) or ("over $1b" in o)) for o in outcome], dtype=np.int64)
     texts = [founder_slot_texts(r["input"]) for r in rows]
     slots = {slot: _text(_embed([t[slot] for t in texts])) for slot in FOUNDER_SLOTS}
     return _assemble("founders", slots, y)

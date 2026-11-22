@@ -29,7 +29,7 @@ ARM_ORDER = ["grpo_nostd", "grpo", "ppo", "mc_tuned", "mc_default"]
 def table(frame: pd.DataFrame, numeric: tuple[str, ...] = (), digits: int = 2) -> str:
     """An HTML table; ``numeric`` columns are right-aligned with tabular figures."""
     head = "".join(
-        f'<th{" class=num" if c in numeric else ""}>{escape(str(c))}</th>' for c in frame.columns
+        f"<th{' class=num' if c in numeric else ''}>{escape(str(c))}</th>" for c in frame.columns
     )
     body = []
     for _, row in frame.iterrows():
@@ -40,20 +40,30 @@ def table(frame: pd.DataFrame, numeric: tuple[str, ...] = (), digits: int = 2) -
                 text = "" if np.isnan(value) else f"{value:.{digits}f}"
             else:
                 text = str(value)
-            cells.append(f'<td{" class=num" if column in numeric else ""}>{escape(text)}</td>')
+            cells.append(f"<td{' class=num' if column in numeric else ''}>{escape(text)}</td>")
         body.append(f"<tr>{''.join(cells)}</tr>")
     return f'<div class="scroll"><table><thead><tr>{head}</tr></thead><tbody>{"".join(body)}</tbody></table></div>'
 
 
-def curve_series(curves: pd.DataFrame, anchors: pd.DataFrame, regime: str) -> dict[str, tuple[list[float], list[float]]]:
+def curve_series(
+    curves: pd.DataFrame, anchors: pd.DataFrame, regime: str
+) -> dict[str, tuple[list[float], list[float]]]:
     usable = anchors.set_index("condition")
-    mine = curves[(curves["regime"] == regime) & curves["condition"].isin(usable.index[~usable["degenerate"]])].copy()
-    mine["norm"] = (mine["test_ret"] - mine["condition"].map(usable["random"])) / mine["condition"].map(usable["gap"])
+    mine = curves[
+        (curves["regime"] == regime) & curves["condition"].isin(usable.index[~usable["degenerate"]])
+    ].copy()
+    mine["norm"] = (mine["test_ret"] - mine["condition"].map(usable["random"])) / mine[
+        "condition"
+    ].map(usable["gap"])
     grid = np.linspace(0, 1, 11)
     out = {}
     for arm in MAIN:
         runs = [
-            np.interp(grid, run.sort_values("compute")["compute"] / run["budget"].iloc[0], run.sort_values("compute")["norm"])
+            np.interp(
+                grid,
+                run.sort_values("compute")["compute"] / run["budget"].iloc[0],
+                run.sort_values("compute")["norm"],
+            )
             for _, run in mine[mine["arm"] == arm].groupby(["condition", "seed"])
         ]
         if runs:
@@ -75,27 +85,38 @@ def fragments() -> dict[str, str]:
     for regime in ("R1", "R2"):
         title = {"R1": "R1, TRL's default rewards", "R2": "R2, cost-aware rewards"}[regime]
         parts[f"chart_main_{regime}"] = svg.dot_plot(
-            e1, ARM_ORDER, regime, f"{title}: normalised test return by dataset (mean and 95% CI over seeds)"
+            e1,
+            ARM_ORDER,
+            regime,
+            f"{title}: normalised test return by dataset (mean and 95% CI over seeds)",
         )
         parts[f"chart_curves_{regime}"] = svg.curves(
-            curve_series(curves, anchors, regime), ARM_ORDER,
+            curve_series(curves, anchors, regime),
+            ARM_ORDER,
             f"{title}: mean normalised test return as the budget is spent",
             x_label="share of the compute budget (1 = one default TRL pass over the training set)",
         )
     aggregate = analysis.aggregate(e1, ARM_ORDER).sort_values("mean_norm", ascending=False)
     by_regime = {
-        regime: analysis.aggregate(e1[e1["regime"] == regime], ARM_ORDER).set_index("arm")["mean_norm"]
+        regime: analysis.aggregate(e1[e1["regime"] == regime], ARM_ORDER).set_index("arm")[
+            "mean_norm"
+        ]
         for regime in ("R1", "R2")
     }
-    pooled = pd.DataFrame({
-        "Optimiser": aggregate["arm"].map(svg.NAMES),
-        "Return": [f"{m:.2f}" for m in aggregate["mean_norm"]],
-        "95% CI": [f"{a:.2f} to {b:.2f}" for a, b in zip(aggregate["low"], aggregate["high"], strict=True)],
-        "R1": [f"{by_regime['R1'][a]:.2f}" for a in aggregate["arm"]],
-        "R2": [f"{by_regime['R2'][a]:.2f}" for a in aggregate["arm"]],
-        "Below random": [f"{v:.0%}" for v in aggregate["below_random"]],
-        "Seconds": [f"{v:.0f}" for v in aggregate["wall"]],
-    })
+    pooled = pd.DataFrame(
+        {
+            "Optimiser": aggregate["arm"].map(svg.NAMES),
+            "Return": [f"{m:.2f}" for m in aggregate["mean_norm"]],
+            "95% CI": [
+                f"{a:.2f} to {b:.2f}"
+                for a, b in zip(aggregate["low"], aggregate["high"], strict=True)
+            ],
+            "R1": [f"{by_regime['R1'][a]:.2f}" for a in aggregate["arm"]],
+            "R2": [f"{by_regime['R2'][a]:.2f}" for a in aggregate["arm"]],
+            "Below random": [f"{v:.0%}" for v in aggregate["below_random"]],
+            "Seconds": [f"{v:.0f}" for v in aggregate["wall"]],
+        }
+    )
     parts["table_pooled"] = table(pooled, numeric=tuple(pooled.columns[1:]))
     frames = {"e1": e1}
     if (RESULTS / "raw" / "e2").exists():
@@ -111,30 +132,52 @@ def fragments() -> dict[str, str]:
             low, high = stats.stratified_bootstrap(by_condition)
             mean = float(np.mean([v.mean() for v in by_condition.values()]))
             rows.append((LADDER_LABELS[arm], mean, low, high, arm in ("grpo", "grpo_nostd")))
-        parts["chart_ladder"] = svg.levels(rows, "What the advantage is measured against (same data, same clipped objective)")
+        parts["chart_ladder"] = svg.levels(
+            rows, "What the advantage is measured against (same data, same clipped objective)"
+        )
     tests = analysis.confirmatory(frames)
-    labels = [f"{r['hypothesis']}  {svg.NAMES.get(r['a'], r['a'])} vs {_short(r['b'])}" for _, r in tests.iterrows()]
-    parts["chart_tests"] = svg.forest(tests, "Confirmatory tests: pooled paired difference with 95% CI", labels, margin=analysis.MARGIN)
-    shown = pd.DataFrame({
-        "Test": tests["hypothesis"],
-        "Claim": tests["claim"],
-        "Difference": [f"{d:+.2f}" for d in tests["diff"]],
-        "95% CI": [f"{a:+.2f} to {b:+.2f}" for a, b in zip(tests["ci_low"], tests["ci_high"], strict=True)],
-        "Holm p": [f"{p:.4f}" if p >= 0.0001 else "<0.0001" for p in tests["p_holm"]],
-        "Verdict": tests["verdict"],
-    })
+    labels = [
+        f"{r['hypothesis']}  {svg.NAMES.get(r['a'], r['a'])} vs {_short(r['b'])}"
+        for _, r in tests.iterrows()
+    ]
+    parts["chart_tests"] = svg.forest(
+        tests,
+        "Confirmatory tests: pooled paired difference with 95% CI",
+        labels,
+        margin=analysis.MARGIN,
+    )
+    shown = pd.DataFrame(
+        {
+            "Test": tests["hypothesis"],
+            "Claim": tests["claim"],
+            "Difference": [f"{d:+.2f}" for d in tests["diff"]],
+            "95% CI": [
+                f"{a:+.2f} to {b:+.2f}"
+                for a, b in zip(tests["ci_low"], tests["ci_high"], strict=True)
+            ],
+            "Holm p": [f"{p:.4f}" if p >= 0.0001 else "<0.0001" for p in tests["p_holm"]],
+            "Verdict": tests["verdict"],
+        }
+    )
     parts["table_tests"] = table(shown, numeric=("Difference", "95% CI", "Holm p"))
     for name in ("e6_gradient_bias", "e5_summary", "e3_group_size"):
         path = analysis.SUMMARY / f"{name}.csv"
         if path.exists():
             frame = pd.read_csv(path)
-            parts[f"table_{name}"] = table(frame, numeric=tuple(c for c in frame.columns if frame[c].dtype.kind == "f"))
+            parts[f"table_{name}"] = table(
+                frame, numeric=tuple(c for c in frame.columns if frame[c].dtype.kind == "f")
+            )
     return parts
 
 
 def _short(arm: str) -> str:
-    return {"mc_tuned": "TRL tuned", "ppo": "PPO", "grpo": "GRPO (canonical)",
-            "grpo_batch": "batch baseline", "grpo_nostd": "GRPO (mean-centred)"}.get(arm, arm)
+    return {
+        "mc_tuned": "TRL tuned",
+        "ppo": "PPO",
+        "grpo": "GRPO (canonical)",
+        "grpo_batch": "batch baseline",
+        "grpo_nostd": "GRPO (mean-centred)",
+    }.get(arm, arm)
 
 
 def main() -> None:

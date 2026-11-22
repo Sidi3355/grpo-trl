@@ -31,28 +31,56 @@ COLOURS = {
 }
 MAIN_ARMS = ("mc_default", "mc_tuned", "ppo", "grpo", "grpo_nostd")
 SHORT = {
-    "mc_default": "TRL", "mc_tuned": "TRL tuned", "ppo": "PPO",
-    "grpo": "GRPO", "grpo_nostd": "GRPO mean-centred",
+    "mc_default": "TRL",
+    "mc_tuned": "TRL tuned",
+    "ppo": "PPO",
+    "grpo": "GRPO",
+    "grpo_nostd": "GRPO mean-centred",
 }
 DATASET_TITLES = {
-    "synth-route": "synthetic routing", "founders": "founders", "kickstarter": "kickstarter",
-    "fakejobs": "job postings", "credit": "credit", "adult": "census income",
+    "synth-route": "synthetic routing",
+    "founders": "founders",
+    "kickstarter": "kickstarter",
+    "fakejobs": "job postings",
+    "credit": "credit",
+    "adult": "census income",
 }
 REGIME_TITLES = {"R1": "R1: TRL default rewards", "R2": "R2: cost-aware"}
 
 
 def _style() -> None:
-    plt.rcParams.update({
-        "figure.facecolor": SURFACE, "axes.facecolor": SURFACE, "savefig.facecolor": SURFACE,
-        "font.family": "DejaVu Sans", "font.size": 9, "text.color": INK,
-        "axes.edgecolor": GRID, "axes.labelcolor": MUTED, "axes.titlesize": 9.5,
-        "axes.titleweight": "bold", "axes.titlecolor": INK, "axes.titlelocation": "left",
-        "xtick.color": MUTED, "ytick.color": MUTED, "xtick.labelsize": 8, "ytick.labelsize": 8,
-        "axes.spines.top": False, "axes.spines.right": False,
-        "axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.6, "grid.linestyle": "-",
-        "axes.axisbelow": True, "lines.linewidth": 2.0, "legend.frameon": False,
-        "figure.dpi": 100, "savefig.dpi": 200, "savefig.bbox": "tight",
-    })
+    plt.rcParams.update(
+        {
+            "figure.facecolor": SURFACE,
+            "axes.facecolor": SURFACE,
+            "savefig.facecolor": SURFACE,
+            "font.family": "DejaVu Sans",
+            "font.size": 9,
+            "text.color": INK,
+            "axes.edgecolor": GRID,
+            "axes.labelcolor": MUTED,
+            "axes.titlesize": 9.5,
+            "axes.titleweight": "bold",
+            "axes.titlecolor": INK,
+            "axes.titlelocation": "left",
+            "xtick.color": MUTED,
+            "ytick.color": MUTED,
+            "xtick.labelsize": 8,
+            "ytick.labelsize": 8,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "axes.grid": True,
+            "grid.color": GRID,
+            "grid.linewidth": 0.6,
+            "grid.linestyle": "-",
+            "axes.axisbelow": True,
+            "lines.linewidth": 2.0,
+            "legend.frameon": False,
+            "figure.dpi": 100,
+            "savefig.dpi": 200,
+            "savefig.bbox": "tight",
+        }
+    )
 
 
 def _save(fig: plt.Figure, name: str) -> Path:
@@ -73,7 +101,9 @@ def main_results(frame: pd.DataFrame) -> Path:
     """Normalised test return of every main arm in every condition (mean and 95% CI)."""
     _style()
     datasets = list(dict.fromkeys(frame["dataset"]))
-    fig, axes = plt.subplots(2, len(datasets), figsize=(2.15 * len(datasets) + 0.6, 5.6), sharey="row")
+    fig, axes = plt.subplots(
+        2, len(datasets), figsize=(2.15 * len(datasets) + 0.6, 5.6), sharey="row"
+    )
     for r, regime in enumerate(("R1", "R2")):
         for c, dataset in enumerate(datasets):
             ax = axes[r, c]
@@ -84,11 +114,22 @@ def main_results(frame: pd.DataFrame) -> Path:
                 if not len(values):
                     continue
                 mean, low, high = stats.mean_ci(values)
-                ax.plot([x, x], [low, high], color=COLOURS[arm], linewidth=2, solid_capstyle="round")
-                ax.plot(x, mean, "o", color=COLOURS[arm], markersize=7,
-                        markeredgecolor=SURFACE, markeredgewidth=1.5)
+                ax.plot(
+                    [x, x], [low, high], color=COLOURS[arm], linewidth=2, solid_capstyle="round"
+                )
+                ax.plot(
+                    x,
+                    mean,
+                    "o",
+                    color=COLOURS[arm],
+                    markersize=7,
+                    markeredgecolor=SURFACE,
+                    markeredgewidth=1.5,
+                )
             ax.set_xticks(range(len(MAIN_ARMS)))
-            ax.set_xticklabels([SHORT[a] for a in MAIN_ARMS] if r == 1 else [], rotation=55, ha="right")
+            ax.set_xticklabels(
+                [SHORT[a] for a in MAIN_ARMS] if r == 1 else [], rotation=55, ha="right"
+            )
             ax.set_xlim(-0.6, len(MAIN_ARMS) - 0.4)
             ax.grid(axis="x", visible=False)
             if r == 0:
@@ -96,13 +137,34 @@ def main_results(frame: pd.DataFrame) -> Path:
             if c == 0:
                 ax.set_ylabel(f"{REGIME_TITLES[regime]}\nnormalised test return")
             if mine["degenerate"].any():
-                ax.text(0.5, 0.04, "anchors too close:\nnot pooled", transform=ax.transAxes,
-                        ha="center", va="bottom", fontsize=7, color=MUTED)
-    handles = [plt.Line2D([], [], marker="o", linestyle="-", color=COLOURS[a], label=ARM_LABELS[a],
-                          markersize=7) for a in MAIN_ARMS]
-    fig.legend(handles=handles, loc="upper center", ncol=5, bbox_to_anchor=(0.5, 1.02), fontsize=8.5)
-    fig.text(0.995, 0.005, "0 = random policy, 1 = best fixed set of slots; dot = mean over seeds, bar = 95% CI",
-             ha="right", va="bottom", fontsize=7.5, color=MUTED)
+                ax.text(
+                    0.5,
+                    0.04,
+                    "anchors too close:\nnot pooled",
+                    transform=ax.transAxes,
+                    ha="center",
+                    va="bottom",
+                    fontsize=7,
+                    color=MUTED,
+                )
+    handles = [
+        plt.Line2D(
+            [], [], marker="o", linestyle="-", color=COLOURS[a], label=ARM_LABELS[a], markersize=7
+        )
+        for a in MAIN_ARMS
+    ]
+    fig.legend(
+        handles=handles, loc="upper center", ncol=5, bbox_to_anchor=(0.5, 1.02), fontsize=8.5
+    )
+    fig.text(
+        0.995,
+        0.005,
+        "0 = random policy, 1 = best fixed set of slots; dot = mean over seeds, bar = 95% CI",
+        ha="right",
+        va="bottom",
+        fontsize=7.5,
+        color=MUTED,
+    )
     fig.tight_layout(rect=(0, 0.02, 1, 0.97))
     return _save(fig, "fig1_main_results")
 
@@ -114,10 +176,22 @@ def hypothesis_forest(table: pd.DataFrame) -> Path:
     fig, ax = plt.subplots(figsize=(8.6, 0.48 * len(table) + 1.3))
     ax.axvline(0.0, color=MUTED, linewidth=0.8)
     for y, row in table.iterrows():
-        ax.plot([row["ci_low"], row["ci_high"]], [y, y], color=COLOURS["grpo_nostd"],
-                linewidth=2, solid_capstyle="round")
-        ax.plot(row["diff"], y, "o", color=COLOURS["grpo_nostd"], markersize=7,
-                markeredgecolor=SURFACE, markeredgewidth=1.5)
+        ax.plot(
+            [row["ci_low"], row["ci_high"]],
+            [y, y],
+            color=COLOURS["grpo_nostd"],
+            linewidth=2,
+            solid_capstyle="round",
+        )
+        ax.plot(
+            row["diff"],
+            y,
+            "o",
+            color=COLOURS["grpo_nostd"],
+            markersize=7,
+            markeredgecolor=SURFACE,
+            markeredgewidth=1.5,
+        )
         if row["kind"] == "noninferiority":
             ax.plot([-0.10, -0.10], [y - 0.32, y + 0.32], color=INK, linewidth=1.2)
     ax.set_yticks(range(len(table)))
@@ -126,8 +200,17 @@ def hypothesis_forest(table: pd.DataFrame) -> Path:
     ax.grid(axis="y", visible=False)
     span = ax.get_xlim()
     for y, row in table.iterrows():
-        ax.text(span[1] + 0.02 * (span[1] - span[0]), y, row["verdict"], va="center", fontsize=8, color=INK)
-    ax.set_title("Confirmatory tests (95% stratified bootstrap CI; short tick = non-inferiority margin)")
+        ax.text(
+            span[1] + 0.02 * (span[1] - span[0]),
+            y,
+            row["verdict"],
+            va="center",
+            fontsize=8,
+            color=INK,
+        )
+    ax.set_title(
+        "Confirmatory tests (95% stratified bootstrap CI; short tick = non-inferiority margin)"
+    )
     return _save(fig, "fig2_hypotheses")
 
 
@@ -136,7 +219,9 @@ def learning_curves(curves: pd.DataFrame, anchors: pd.DataFrame, x: str = "fract
     _style()
     table = anchors.set_index("condition")
     curves = curves[curves["condition"].isin(table.index[~table["degenerate"]])].copy()
-    curves["norm"] = (curves["test_ret"] - curves["condition"].map(table["random"])) / curves["condition"].map(table["gap"])
+    curves["norm"] = (curves["test_ret"] - curves["condition"].map(table["random"])) / curves[
+        "condition"
+    ].map(table["gap"])
     grid = np.linspace(0, 1, 11)
     fig, axes = plt.subplots(1, 2, figsize=(9.6, 3.9), sharey=True)
     for ax, regime in zip(axes, ("R1", "R2"), strict=True):
@@ -170,8 +255,14 @@ def learning_curves(curves: pd.DataFrame, anchors: pd.DataFrame, x: str = "fract
     return _save(fig, "fig3_learning_curves")
 
 
-def ladder(frame: pd.DataFrame, order: list[str], labels: dict[str, str], name: str, title: str,
-           highlight: tuple[str, ...] = ("grpo", "grpo_nostd")) -> Path:
+def ladder(
+    frame: pd.DataFrame,
+    order: list[str],
+    labels: dict[str, str],
+    name: str,
+    title: str,
+    highlight: tuple[str, ...] = ("grpo", "grpo_nostd"),
+) -> Path:
     """Pooled normalised return of each arm of a ladder (mean over conditions, 95% CI)."""
     _style()
     usable = frame[~frame["degenerate"]]
@@ -186,7 +277,9 @@ def ladder(frame: pd.DataFrame, order: list[str], labels: dict[str, str], name: 
         low, high = stats.stratified_bootstrap(by_condition)
         colour = COLOURS["grpo_nostd"] if arm in highlight else "#86b6ef"
         ax.plot([low, high], [y, y], color=colour, linewidth=2, solid_capstyle="round")
-        ax.plot(mean, y, "o", color=colour, markersize=7, markeredgecolor=SURFACE, markeredgewidth=1.5)
+        ax.plot(
+            mean, y, "o", color=colour, markersize=7, markeredgecolor=SURFACE, markeredgewidth=1.5
+        )
         ax.text(high + 0.02, y, f"{mean:.2f}", va="center", fontsize=8, color=INK)
     ax.set_yticks(range(len(order)))
     ax.set_yticklabels([labels[a] for a in reversed(order)], color=INK)
@@ -217,8 +310,16 @@ def group_size(frame: pd.DataFrame) -> Path:
             continue
         positions = np.log2(sizes)
         ax.fill_between(positions, lows, highs, color=COLOURS[base], alpha=0.15, linewidth=0)
-        ax.plot(positions, means, "o-", color=COLOURS[base], markersize=7,
-                markeredgecolor=SURFACE, markeredgewidth=1.5, label=ARM_LABELS[base])
+        ax.plot(
+            positions,
+            means,
+            "o-",
+            color=COLOURS[base],
+            markersize=7,
+            markeredgecolor=SURFACE,
+            markeredgewidth=1.5,
+            label=ARM_LABELS[base],
+        )
         ax.text(positions[-1] + 0.12, means[-1], SHORT[base], va="center", fontsize=8, color=INK)
     ax.set_xticks(np.log2([2, 4, 8, 16, 32]))
     ax.set_xticklabels(["2", "4", "8", "16", "32"])
@@ -235,20 +336,34 @@ def behaviour(frame: pd.DataFrame) -> Path:
     _style()
     datasets = list(dict.fromkeys(frame["dataset"]))
     fig, axes = plt.subplots(2, 2, figsize=(9.8, 5.6), sharex="col")
-    columns = (("test_n_slots", "slots revealed per sample"), ("test_called", "share of samples called positive"))
+    columns = (
+        ("test_n_slots", "slots revealed per sample"),
+        ("test_called", "share of samples called positive"),
+    )
     width = 0.15
     for r, regime in enumerate(("R1", "R2")):
         for c, (column, label) in enumerate(columns):
             ax = axes[r, c]
             for k, arm in enumerate(MAIN_ARMS):
                 means = [
-                    frame[(frame["dataset"] == d) & (frame["regime"] == regime) & (frame["arm"] == arm)][column].mean()
+                    frame[
+                        (frame["dataset"] == d)
+                        & (frame["regime"] == regime)
+                        & (frame["arm"] == arm)
+                    ][column].mean()
                     for d in datasets
                 ]
-                ax.bar(np.arange(len(datasets)) + (k - 2) * width, means, width=width - 0.02,
-                       color=COLOURS[arm], label=ARM_LABELS[arm])
+                ax.bar(
+                    np.arange(len(datasets)) + (k - 2) * width,
+                    means,
+                    width=width - 0.02,
+                    color=COLOURS[arm],
+                    label=ARM_LABELS[arm],
+                )
             ax.set_xticks(range(len(datasets)))
-            ax.set_xticklabels([DATASET_TITLES.get(d, d) for d in datasets], rotation=25, ha="right")
+            ax.set_xticklabels(
+                [DATASET_TITLES.get(d, d) for d in datasets], rotation=25, ha="right"
+            )
             ax.grid(axis="x", visible=False)
             ax.set_ylabel(label)
             ax.set_title(REGIME_TITLES[regime])

@@ -23,7 +23,6 @@ from __future__ import annotations
 import argparse
 import json
 import multiprocessing as mp
-from pathlib import Path
 from typing import Any
 
 GROUP = 16
@@ -56,7 +55,10 @@ def run(job: tuple[str, str, int]) -> str:
         # advantage per episode, weight per step
         "reference": (centred, torch.ones_like(returns)),
         "grpo": (group_advantages(returns, GROUP, "group"), 1.0 / lengths),
-        "grpo_no_length_norm": (group_advantages(returns, GROUP, "group"), torch.ones_like(returns)),
+        "grpo_no_length_norm": (
+            group_advantages(returns, GROUP, "group"),
+            torch.ones_like(returns),
+        ),
         "grpo_nostd": (group_advantages(returns, GROUP, "group_nostd"), 1.0 / lengths),
         "grpo_batch": (batch_advantages(returns, "batch"), 1.0 / lengths),
         "no_baseline": (batch_advantages(returns, "none"), 1.0 / lengths),
@@ -69,7 +71,11 @@ def run(job: tuple[str, str, int]) -> str:
     gradients = {name: [torch.zeros_like(p) for p in parameters] for name in rules}
     for index in torch.arange(len(episode)).split(8192):
         states = x[rows[episode[index]]] * masks[index][:, columns]
-        logp = masked_log_probs(policy(states), allowed[index]).gather(1, actions[index, None]).squeeze(1)
+        logp = (
+            masked_log_probs(policy(states), allowed[index])
+            .gather(1, actions[index, None])
+            .squeeze(1)
+        )
         for name, (advantage, weight) in rules.items():
             coefficient = (advantage * weight)[episode[index]]
             grads = torch.autograd.grad((coefficient * logp).sum(), parameters, retain_graph=True)
@@ -95,11 +101,19 @@ def run(job: tuple[str, str, int]) -> str:
     same_call = (called.view(-1, GROUP).float().std(dim=1) == 0).float().mean()
     spread = grouped.std(dim=1)
     record: dict[str, Any] = {
-        "dataset": dataset, "regime": regime, "seed": seed, "group_size": GROUP,
-        "cosine_to_reference": cosine, "mean_advantage_by_reveals": by_length,
-        "share_of_episodes_by_reveals": {str(int(k)): float((reveals == k).float().mean()) for k in reveals.unique()},
+        "dataset": dataset,
+        "regime": regime,
+        "seed": seed,
+        "group_size": GROUP,
+        "cosine_to_reference": cosine,
+        "mean_advantage_by_reveals": by_length,
+        "share_of_episodes_by_reveals": {
+            str(int(k)): float((reveals == k).float().mean()) for k in reveals.unique()
+        },
         "share_groups_same_call": float(same_call),
-        "group_std_p10_p50_p90": [float(q) for q in torch.quantile(spread, torch.tensor([0.1, 0.5, 0.9]))],
+        "group_std_p10_p50_p90": [
+            float(q) for q in torch.quantile(spread, torch.tensor([0.1, 0.5, 0.9]))
+        ],
     }
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(record, indent=1))

@@ -47,8 +47,11 @@ def main(dataset: str) -> None:
             (xtr, ytr), (xva, yva), _ = split_pool(pool, seed)
             rng = np.random.default_rng(seed)
             model = VerifiableRL(
-                dict(pool.slots), random_state=seed,
-                pretrain_epochs=epochs, pretrain_lr=lr, pretrain_batch=BATCH,
+                dict(pool.slots),
+                random_state=seed,
+                pretrain_epochs=epochs,
+                pretrain_lr=lr,
+                pretrain_batch=BATCH,
             )
             features = model._layout(xtr, fitting=True)
             model._build_networks(rng)
@@ -56,22 +59,31 @@ def main(dataset: str) -> None:
             mask_rng = np.random.default_rng(5)
             scores = {}
             for name, (x, y) in (("train", (xtr, ytr)), ("val", (xva, yva))):
-                masks = np.vstack([_random_masks(len(x), n_slots, 1, n_slots, mask_rng) for _ in range(4)])
+                masks = np.vstack(
+                    [_random_masks(len(x), n_slots, 1, n_slots, mask_rng) for _ in range(4)]
+                )
                 with torch.no_grad():
                     p = torch.sigmoid(model.classifier_(model._states(np.tile(x, (4, 1)), masks)))
                 scores[name] = log_loss(p.numpy().astype(float), np.tile(y, 4))
             losses.append(scores["val"])
             gaps.append(scores["val"] - scores["train"])
-        rows.append({
-            "pretrain_lr": lr, "pretrain_epochs": epochs, "pretrain_batch": BATCH,
-            "val_log_loss": float(np.mean(losses)), "val_minus_train": float(np.mean(gaps)),
-        })
+        rows.append(
+            {
+                "pretrain_lr": lr,
+                "pretrain_epochs": epochs,
+                "pretrain_batch": BATCH,
+                "val_log_loss": float(np.mean(losses)),
+                "val_minus_train": float(np.mean(gaps)),
+            }
+        )
         print(dataset, rows[-1], flush=True)
     best = min(r["val_log_loss"] for r in rows)
     tied = [r for r in rows if r["val_log_loss"] <= best + 0.005]
     chosen = min(tied, key=lambda r: (r["pretrain_epochs"], r["val_log_loss"]))
     OUT.mkdir(exist_ok=True)
-    (OUT / f"{dataset}.json").write_text(json.dumps({"dataset": dataset, "chosen": chosen, "grid": rows}, indent=1))
+    (OUT / f"{dataset}.json").write_text(
+        json.dumps({"dataset": dataset, "chosen": chosen, "grid": rows}, indent=1)
+    )
     print("CHOSEN", dataset, chosen, flush=True)
 
 

@@ -82,8 +82,15 @@ def build_problem(
         torch.save(stored, cached)
     prevalence = float(ytr.mean())
     problem = Problem(
-        dataset, seed, dict(pool.slots), regime_r1(n_slots), train, val, test,
-        stored["classifier"], stored["policy"],
+        dataset,
+        seed,
+        dict(pool.slots),
+        regime_r1(n_slots),
+        train,
+        val,
+        test,
+        stored["classifier"],
+        stored["policy"],
     )
     classifier = problem.model().classifier_
     everything = torch.ones(len(val), n_slots, dtype=torch.bool)
@@ -188,4 +195,12 @@ def save(record: dict[str, Any], path: Path) -> None:
 
 
 RESULTS = ROOT / "results"
-__all__ = ["RESULTS", "build_problem", "run_arm", "initial_record", "save", "Regime", "returns_of_masks"]
+__all__ = [
+    "RESULTS",
+    "Regime",
+    "build_problem",
+    "initial_record",
+    "returns_of_masks",
+    "run_arm",
+    "save",
+]

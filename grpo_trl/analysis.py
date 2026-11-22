@@ -1,6 +1,6 @@
 """Load run records and compute the pre-registered tables and tests.
 
-    python -m grpo_trl.analysis          # writes results/summary/
+python -m grpo_trl.analysis          # writes results/summary/
 """
 
 from __future__ import annotations
@@ -72,9 +72,14 @@ def _ordered(frame: pd.DataFrame) -> pd.DataFrame:
     from .configs import DATASETS
 
     rank = {name: i for i, name in enumerate(DATASETS)}
-    keys = pd.DataFrame({
-        "r": frame["regime"], "d": frame["dataset"].map(rank), "a": frame["arm"], "s": frame["seed"],
-    })
+    keys = pd.DataFrame(
+        {
+            "r": frame["regime"],
+            "d": frame["dataset"].map(rank),
+            "a": frame["arm"],
+            "s": frame["seed"],
+        }
+    )
     return frame.loc[keys.sort_values(["r", "d", "a", "s"]).index].reset_index(drop=True)
 
 
@@ -84,21 +89,37 @@ def load_curves(exp: str) -> pd.DataFrame:
     for path in sorted((RESULTS / "raw" / exp).glob("*.json")):
         record = json.loads(path.read_text())
         key = {
-            "dataset": record["dataset"], "regime": record["regime_name"],
-            "arm": record["arm_name"], "seed": record["seed"], "budget": record["budget"],
+            "dataset": record["dataset"],
+            "regime": record["regime_name"],
+            "arm": record["arm_name"],
+            "seed": record["seed"],
+            "budget": record["budget"],
         }
-        rows.append({
-            **key, "fraction": 0.0, "compute": 0.0, "transitions": 0, "wall": 0.0,
-            "test_ret": record["initial"]["test"]["ret"], "val_ret": record["initial"]["val"]["ret"],
-            "test_n_slots": record["initial"]["test"]["n_slots"],
-        })
+        rows.append(
+            {
+                **key,
+                "fraction": 0.0,
+                "compute": 0.0,
+                "transitions": 0,
+                "wall": 0.0,
+                "test_ret": record["initial"]["test"]["ret"],
+                "val_ret": record["initial"]["val"]["ret"],
+                "test_n_slots": record["initial"]["test"]["n_slots"],
+            }
+        )
         for c in record["checkpoints"]:
-            rows.append({
-                **key, "fraction": c["fraction"], "compute": c["compute"],
-                "transitions": c["transitions"], "wall": c["wall"],
-                "test_ret": c["test"]["ret"], "val_ret": c["val"]["ret"],
-                "test_n_slots": c["test"]["n_slots"],
-            })
+            rows.append(
+                {
+                    **key,
+                    "fraction": c["fraction"],
+                    "compute": c["compute"],
+                    "transitions": c["transitions"],
+                    "wall": c["wall"],
+                    "test_ret": c["test"]["ret"],
+                    "val_ret": c["val"]["ret"],
+                    "test_n_slots": c["test"]["n_slots"],
+                }
+            )
     frame = pd.DataFrame(rows)
     frame["condition"] = frame["dataset"] + "/" + frame["regime"]
     rank = {condition: i for i, condition in enumerate(dict.fromkeys(load_runs(exp)["condition"]))}
@@ -155,9 +176,11 @@ def add_normalised(frame: pd.DataFrame, split: str = "test") -> pd.DataFrame:
 
 def paired(frame: pd.DataFrame, a: str, b: str, column: str = "norm") -> dict[str, np.ndarray]:
     """Per condition, ``a`` minus ``b`` on the seeds both ran."""
-    wide = frame[frame["arm"].isin([a, b])].pivot_table(
-        index=["condition", "seed"], columns="arm", values=column
-    ).dropna()
+    wide = (
+        frame[frame["arm"].isin([a, b])]
+        .pivot_table(index=["condition", "seed"], columns="arm", values=column)
+        .dropna()
+    )
     return {
         str(condition): (group[a] - group[b]).to_numpy()
         for condition, group in wide.groupby(level="condition", sort=False)
@@ -178,26 +201,84 @@ class Hypothesis:
 
 
 HYPOTHESES = (
-    Hypothesis("H1", "grpo", "ppo", "e1", ("R1", "R2"), "superiority",
-               "GRPO (canonical) beats PPO at equal compute"),
-    Hypothesis("H2a", "grpo", "mc_tuned", "e1", ("R2",), "superiority",
-               "GRPO (canonical) beats TRL's tuned optimiser in R2"),
-    Hypothesis("H2b", "grpo", "mc_tuned", "e1", ("R1",), "noninferiority",
-               "GRPO (canonical) is non-inferior to TRL's tuned optimiser in R1"),
-    Hypothesis("H3", "grpo", "grpo_batch", "e2", ("R1", "R2"), "superiority",
-               "Per-sample groups beat batch groups"),
-    Hypothesis("H4", "grpo_nostd", "grpo", "e2", ("R1", "R2"), "two-sided",
-               "Mean-centred and z-scored GRPO differ (guess: mean-centred is better)"),
-    Hypothesis("H1'", "grpo_nostd", "ppo", "e1", ("R1", "R2"), "superiority",
-               "GRPO (mean-centred) beats PPO at equal compute"),
-    Hypothesis("H2a'", "grpo_nostd", "mc_tuned", "e1", ("R2",), "superiority",
-               "GRPO (mean-centred) beats TRL's tuned optimiser in R2"),
-    Hypothesis("H2b'", "grpo_nostd", "mc_tuned", "e1", ("R1",), "noninferiority",
-               "GRPO (mean-centred) is non-inferior to TRL's tuned optimiser in R1"),
+    Hypothesis(
+        "H1",
+        "grpo",
+        "ppo",
+        "e1",
+        ("R1", "R2"),
+        "superiority",
+        "GRPO (canonical) beats PPO at equal compute",
+    ),
+    Hypothesis(
+        "H2a",
+        "grpo",
+        "mc_tuned",
+        "e1",
+        ("R2",),
+        "superiority",
+        "GRPO (canonical) beats TRL's tuned optimiser in R2",
+    ),
+    Hypothesis(
+        "H2b",
+        "grpo",
+        "mc_tuned",
+        "e1",
+        ("R1",),
+        "noninferiority",
+        "GRPO (canonical) is non-inferior to TRL's tuned optimiser in R1",
+    ),
+    Hypothesis(
+        "H3",
+        "grpo",
+        "grpo_batch",
+        "e2",
+        ("R1", "R2"),
+        "superiority",
+        "Per-sample groups beat batch groups",
+    ),
+    Hypothesis(
+        "H4",
+        "grpo_nostd",
+        "grpo",
+        "e2",
+        ("R1", "R2"),
+        "two-sided",
+        "Mean-centred and z-scored GRPO differ (guess: mean-centred is better)",
+    ),
+    Hypothesis(
+        "H1'",
+        "grpo_nostd",
+        "ppo",
+        "e1",
+        ("R1", "R2"),
+        "superiority",
+        "GRPO (mean-centred) beats PPO at equal compute",
+    ),
+    Hypothesis(
+        "H2a'",
+        "grpo_nostd",
+        "mc_tuned",
+        "e1",
+        ("R2",),
+        "superiority",
+        "GRPO (mean-centred) beats TRL's tuned optimiser in R2",
+    ),
+    Hypothesis(
+        "H2b'",
+        "grpo_nostd",
+        "mc_tuned",
+        "e1",
+        ("R1",),
+        "noninferiority",
+        "GRPO (mean-centred) is non-inferior to TRL's tuned optimiser in R1",
+    ),
 )
 
 
-def compare(frame: pd.DataFrame, a: str, b: str, kind: str = "superiority", column: str = "norm") -> dict[str, Any]:
+def compare(
+    frame: pd.DataFrame, a: str, b: str, kind: str = "superiority", column: str = "norm"
+) -> dict[str, Any]:
     """The pooled comparison of ``a`` and ``b`` on the non-degenerate conditions of ``frame``."""
     usable = frame[~frame["degenerate"]]
     differences = paired(usable, a, b, column)
@@ -212,12 +293,21 @@ def compare(frame: pd.DataFrame, a: str, b: str, kind: str = "superiority", colu
     poi, poi_low, poi_high = stats.probability_of_improvement(differences)
     wins, ties, losses = stats.wins_ties_losses(differences)
     return {
-        "a": a, "b": b, "kind": kind,
+        "a": a,
+        "b": b,
+        "kind": kind,
         "n_conditions": len(differences),
         "n_pairs": int(sum(len(d) for d in differences.values())),
-        "diff": mean, "ci_low": low, "ci_high": high, "p": p,
-        "poi": poi, "poi_low": poi_low, "poi_high": poi_high,
-        "wins": wins, "ties": ties, "losses": losses,
+        "diff": mean,
+        "ci_low": low,
+        "ci_high": high,
+        "p": p,
+        "poi": poi,
+        "poi_low": poi_low,
+        "poi_high": poi_high,
+        "wins": wins,
+        "ties": ties,
+        "losses": losses,
     }
 
 
@@ -264,7 +354,16 @@ def per_condition(frame: pd.DataFrame, column: str = "test_ret") -> pd.DataFrame
     rows = []
     for (condition, arm), group in frame.groupby(["condition", "arm"], sort=False):
         mean, low, high = stats.mean_ci(group[column].to_numpy())
-        rows.append({"condition": condition, "arm": arm, "mean": mean, "low": low, "high": high, "n": len(group)})
+        rows.append(
+            {
+                "condition": condition,
+                "arm": arm,
+                "mean": mean,
+                "low": low,
+                "high": high,
+                "n": len(group),
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -276,22 +375,31 @@ def aggregate(frame: pd.DataFrame, arms: list[str]) -> pd.DataFrame:
         mine = usable[usable["arm"] == arm]
         if mine.empty:
             continue
-        by_condition = {str(c): g["norm"].to_numpy() for c, g in mine.groupby("condition", sort=False)}
+        by_condition = {
+            str(c): g["norm"].to_numpy() for c, g in mine.groupby("condition", sort=False)
+        }
         mean = float(np.mean([v.mean() for v in by_condition.values()]))
         low, high = stats.stratified_bootstrap(by_condition)
         iqm, iqm_low, iqm_high = stats.iqm(by_condition)
         spread = float(np.mean([v.std(ddof=1) for v in by_condition.values() if len(v) > 1]))
-        rows.append({
-            "arm": arm, "mean_norm": mean, "low": low, "high": high,
-            "iqm": iqm, "iqm_low": iqm_low, "iqm_high": iqm_high,
-            "seed_sd": spread,
-            "below_random": float((mine["norm"] < 0).mean()),
-            "above_static": float((mine["norm"] > 1).mean()),
-            "slots": float(mine["test_n_slots"].mean()),
-            "transitions": float(mine["transitions"].mean()),
-            "wall": float(mine["wall"].mean()),
-            "train_minus_test": float((mine["train_ret"] - mine["test_ret"]).mean()),
-        })
+        rows.append(
+            {
+                "arm": arm,
+                "mean_norm": mean,
+                "low": low,
+                "high": high,
+                "iqm": iqm,
+                "iqm_low": iqm_low,
+                "iqm_high": iqm_high,
+                "seed_sd": spread,
+                "below_random": float((mine["norm"] < 0).mean()),
+                "above_static": float((mine["norm"] > 1).mean()),
+                "slots": float(mine["test_n_slots"].mean()),
+                "transitions": float(mine["transitions"].mean()),
+                "wall": float(mine["wall"].mean()),
+                "train_minus_test": float((mine["train_ret"] - mine["test_ret"]).mean()),
+            }
+        )
     return pd.DataFrame(rows)
 
 

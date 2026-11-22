@@ -9,7 +9,12 @@ import numpy as np
 DATASETS = ("synth-route", "founders", "kickstarter", "fakejobs", "credit", "adult")
 REGIMES = ("R1", "R2")
 DEV_CONDITIONS = (("synth-route", "R2"), ("founders", "R1"), ("founders", "R2"), ("credit", "R2"))
-ABLATION_CONDITIONS = (("synth-route", "R2"), ("founders", "R2"), ("credit", "R2"), ("founders", "R1"))
+ABLATION_CONDITIONS = (
+    ("synth-route", "R2"),
+    ("founders", "R2"),
+    ("credit", "R2"),
+    ("founders", "R1"),
+)
 DEV_SEEDS = (1000, 1001, 1002)
 
 Arm = tuple[str, dict[str, Any]]  # ("mc" | "pg", settings)

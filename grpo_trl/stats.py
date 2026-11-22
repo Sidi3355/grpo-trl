@@ -88,7 +88,9 @@ def probability_of_improvement(
     return point, float(low), float(high)
 
 
-def iqm(scores: Mapping[str, Floats], n: int = N_RESAMPLES, seed: int = 0) -> tuple[float, float, float]:
+def iqm(
+    scores: Mapping[str, Floats], n: int = N_RESAMPLES, seed: int = 0
+) -> tuple[float, float, float]:
     """Interquartile mean over all runs (Agarwal et al., 2021), stratified bootstrap 95% CI."""
 
     def interquartile_mean(values: Floats) -> Floats:
@@ -96,9 +98,7 @@ def iqm(scores: Mapping[str, Floats], n: int = N_RESAMPLES, seed: int = 0) -> tu
 
     rng = np.random.default_rng(seed)
     point = float(interquartile_mean(np.concatenate([np.asarray(s) for s in scores.values()])))
-    resampled = [
-        np.asarray(s)[rng.integers(len(s), size=(n, len(s)))] for s in scores.values()
-    ]
+    resampled = [np.asarray(s)[rng.integers(len(s), size=(n, len(s)))] for s in scores.values()]
     boot = interquartile_mean(np.concatenate(resampled, axis=1))
     low, high = np.percentile(boot, [2.5, 97.5])
     return point, float(low), float(high)

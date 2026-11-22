@@ -13,6 +13,9 @@ One trainer; the arms differ in two settings.
     ``"gae_priv"``  the same with a critic that also sees every feature and the label.
     ``"group"``     (R - group mean) / group std, per sample (GRPO; Shao et al., 2024).
     ``"group_nostd"`` R - group mean, scaled by one batch-wide std.
+    ``"group_rawscale"`` R - group mean, divided by the batch std of the *returns*
+                    (post hoc, Amendment A4: the scale no longer shrinks as the policy
+                    converges, so a converged policy gets small updates, not amplified noise).
     ``"group_loo"`` R - mean of the other members, / group std.
     ``"batch"``     (R - batch mean) / batch std (the grouping of arXiv:2511.03527).
     ``"none"``      R / batch std (no baseline).
@@ -35,7 +38,7 @@ from think_reason_learn.verifiable_rl._torch import seeded
 from .meter import Meter
 from .problem import Episodes, Problem, allowed_actions, masked_log_probs, sample_episodes
 
-GROUP_ADVANTAGES = ("group", "group_nostd", "group_loo")
+GROUP_ADVANTAGES = ("group", "group_nostd", "group_loo", "group_rawscale")
 CRITIC_ADVANTAGES = ("gae", "gae_priv")
 EPS = 1e-6
 
@@ -83,6 +86,8 @@ def group_advantages(returns: torch.Tensor, group_size: int, kind: str) -> torch
     elif kind == "group_nostd":
         centred = grouped - mean
         advantage = centred / (centred.std(correction=0) + EPS)
+    elif kind == "group_rawscale":
+        advantage = (grouped - mean) / (returns.std(correction=0) + EPS)
     elif kind == "group_loo":
         others = (grouped.sum(dim=1, keepdim=True) - grouped) / max(group_size - 1, 1)
         advantage = (grouped - others) / (std + EPS)
@@ -221,9 +226,7 @@ def _update(
             flat = torch.cat([critic(critic_inputs(part)) for part in every.split(4096)])
         values = torch.zeros_like(episodes.rewards)
         values[episode, step] = flat
-        padded, padded_targets = gae(
-            episodes.rewards, values, episodes.valid, settings.gae_lambda
-        )
+        padded, padded_targets = gae(episodes.rewards, values, episodes.valid, settings.gae_lambda)
         advantage, targets = padded[episode, step], padded_targets[episode, step]
     elif settings.advantage in GROUP_ADVANTAGES:
         per_episode = group_advantages(episodes.returns, settings.group_size, settings.advantage)

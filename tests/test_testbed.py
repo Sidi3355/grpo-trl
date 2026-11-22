@@ -14,11 +14,15 @@ import torch
 from think_reason_learn.verifiable_rl._episodes import (
     Sample,
     Search,
-    allowed_actions as trl_allowed,
     greedy,
     policy_probs,
-    rewards as trl_rewards,
     rollouts,
+)
+from think_reason_learn.verifiable_rl._episodes import (
+    allowed_actions as trl_allowed,
+)
+from think_reason_learn.verifiable_rl._episodes import (
+    rewards as trl_rewards,
 )
 from think_reason_learn.verifiable_rl._networks import Classifier, PolicyNet
 
@@ -65,11 +69,23 @@ def toy_problem(regime: Regime | None = None, n: int = 240, seed: int = 0) -> Pr
         for i in range(3)
     ]
     regime = regime or Regime(
-        "toy", reward_tp=1.0, reward_fp=-1.0, reward_tn=1.0, reward_fn=-1.0, step_penalty=0.0,
-        reward_threshold=0.5, min_queries=1, max_steps=3, costs=(0.2, 0.1, 0.1),
+        "toy",
+        reward_tp=1.0,
+        reward_fp=-1.0,
+        reward_tn=1.0,
+        reward_fn=-1.0,
+        step_penalty=0.0,
+        reward_threshold=0.5,
+        min_queries=1,
+        max_steps=3,
+        costs=(0.2, 0.1, 0.1),
     )
     return Problem(
-        "toy", seed, dict(SLOTS), regime, *parts,
+        "toy",
+        seed,
+        dict(SLOTS),
+        regime,
+        *parts,
         classifier_state=classifier.state_dict(),
         policy_state=PolicyNet(6, 3, 16).state_dict(),
         policy_hidden=16,
@@ -112,9 +128,17 @@ def test_terminal_rewards_match_trl() -> None:
     states = torch.randn(64, 6)
     regime = regime_r1(3)
     search = Search(
-        n_rollouts=1, max_depth=1, min_queries=1, tau_info=1.0, tau_stop=1.0,
-        reward_tp=regime.reward_tp, reward_fp=regime.reward_fp, reward_tn=regime.reward_tn,
-        reward_fn=regime.reward_fn, step_penalty=regime.step_penalty, repeat_penalty=-5.0,
+        n_rollouts=1,
+        max_depth=1,
+        min_queries=1,
+        tau_info=1.0,
+        tau_stop=1.0,
+        reward_tp=regime.reward_tp,
+        reward_fp=regime.reward_fp,
+        reward_tn=regime.reward_tn,
+        reward_fn=regime.reward_fn,
+        step_penalty=regime.step_penalty,
+        repeat_penalty=-5.0,
         reward_threshold=regime.reward_threshold,
     )
     with torch.no_grad():
@@ -130,12 +154,22 @@ def test_episode_returns_match_trl_rollout_returns() -> None:
     model = problem.model()
     generator = torch.Generator().manual_seed(3)
     rows = torch.arange(40)
-    episodes = sample_episodes(model.policy_, model.classifier_, problem.train, rows, problem, generator)
+    episodes = sample_episodes(
+        model.policy_, model.classifier_, problem.train, rows, problem, generator
+    )
     regime = problem.regime
     search = Search(
-        n_rollouts=1, max_depth=1, min_queries=regime.min_queries, tau_info=1.0, tau_stop=1.0,
-        reward_tp=regime.reward_tp, reward_fp=regime.reward_fp, reward_tn=regime.reward_tn,
-        reward_fn=regime.reward_fn, step_penalty=regime.step_penalty, repeat_penalty=-5.0,
+        n_rollouts=1,
+        max_depth=1,
+        min_queries=regime.min_queries,
+        tau_info=1.0,
+        tau_stop=1.0,
+        reward_tp=regime.reward_tp,
+        reward_fp=regime.reward_fp,
+        reward_tn=regime.reward_tn,
+        reward_fn=regime.reward_fn,
+        step_penalty=regime.step_penalty,
+        repeat_penalty=-5.0,
         reward_threshold=regime.reward_threshold,
     )
     for i in range(40):
@@ -143,7 +177,11 @@ def test_episode_returns_match_trl_rollout_returns() -> None:
         final = episodes.final_masks[i].numpy()[None, :]
         depth = int(final.sum())  # rollouts at depth == max_depth stop at once and pay depth steps
         paid, _ = rollouts(
-            sample, final, depth, (model.policy_, model.classifier_), int(problem.train.y[i]),
+            sample,
+            final,
+            depth,
+            (model.policy_, model.classifier_),
+            int(problem.train.y[i]),
             _with_depth(search, depth),
             np.random.default_rng(0),
         )
@@ -159,13 +197,23 @@ def _with_depth(search: Search, depth: int) -> Search:
 def test_episodes_obey_the_rules() -> None:
     problem = toy_problem()
     problem.regime = Regime(
-        "toy", 1.0, -1.0, 1.0, -1.0, step_penalty=-0.1, reward_threshold=0.5,
-        min_queries=2, max_steps=3, costs=(0.2, 0.1, 0.1),
+        "toy",
+        1.0,
+        -1.0,
+        1.0,
+        -1.0,
+        step_penalty=-0.1,
+        reward_threshold=0.5,
+        min_queries=2,
+        max_steps=3,
+        costs=(0.2, 0.1, 0.1),
     )
     model = problem.model()
     generator = torch.Generator().manual_seed(4)
     rows = torch.arange(len(problem.train)).repeat(4)
-    episodes = sample_episodes(model.policy_, model.classifier_, problem.train, rows, problem, generator)
+    episodes = sample_episodes(
+        model.policy_, model.classifier_, problem.train, rows, problem, generator
+    )
     reveals = episodes.final_masks.sum(dim=1)
     assert (reveals >= 2).all() and (reveals <= 3).all()
     stops = (episodes.actions == 3) & episodes.valid
@@ -177,7 +225,12 @@ def test_episodes_obey_the_rules() -> None:
         slots = [a for a in row if a >= 0]
         assert len(slots) == len(set(slots))
     assert torch.allclose(episodes.rewards.sum(dim=1), episodes.returns)
-    expected, _ = returns_of_masks(model.classifier_, Split(problem.train.x[rows], problem.train.y[rows]), episodes.final_masks, problem)
+    expected, _ = returns_of_masks(
+        model.classifier_,
+        Split(problem.train.x[rows], problem.train.y[rows]),
+        episodes.final_masks,
+        problem,
+    )
     assert torch.allclose(episodes.returns, expected, atol=1e-5)
 
 
@@ -186,7 +239,9 @@ def test_evaluate_uses_trl_deployment_and_scores_it() -> None:
     model = problem.model()
     record = evaluate(model, problem.test, problem)
     masks, paths = model._reveal(problem.test.x.numpy(), None)
-    expected, _ = returns_of_masks(model.classifier_, problem.test, torch.from_numpy(masks), problem)
+    expected, _ = returns_of_masks(
+        model.classifier_, problem.test, torch.from_numpy(masks), problem
+    )
     assert record["ret"] == pytest.approx(float(expected.mean()))
     assert record["n_slots"] == pytest.approx(np.mean([len(p) for p in paths]))
 
@@ -215,8 +270,16 @@ def test_r1_is_the_library_default() -> None:
     from think_reason_learn.verifiable_rl import VerifiableRL
 
     default, regime = VerifiableRL(), regime_r1(6)
-    for name in ("reward_tp", "reward_fp", "reward_tn", "reward_fn", "step_penalty",
-                 "reward_threshold", "min_queries", "max_steps"):
+    for name in (
+        "reward_tp",
+        "reward_fp",
+        "reward_tn",
+        "reward_fn",
+        "step_penalty",
+        "reward_threshold",
+        "min_queries",
+        "max_steps",
+    ):
         assert getattr(regime, name) == getattr(default, name), name
     assert default.slot_costs is None and set(regime.costs) == {0.0}
 
@@ -273,7 +336,9 @@ def test_batch_advantage_uses_one_baseline_for_all() -> None:
     assert torch.allclose(
         batch_advantages(returns, "batch"), (returns - 3.0) / (returns.std(correction=0) + 1e-6)
     )
-    assert torch.allclose(batch_advantages(returns, "none"), returns / (returns.std(correction=0) + 1e-6))
+    assert torch.allclose(
+        batch_advantages(returns, "none"), returns / (returns.std(correction=0) + 1e-6)
+    )
 
 
 def test_gae_matches_hand_computation() -> None:
@@ -327,15 +392,27 @@ def _train(problem: Problem, settings: PGSettings, updates: int) -> dict[str, fl
 
 @pytest.mark.parametrize(
     ("advantage", "collect"),
-    [("group", "grouped"), ("group_nostd", "grouped"), ("group_loo", "grouped"),
-     ("batch", "grouped"), ("gae", "single"), ("gae", "grouped"), ("gae_priv", "grouped")],
+    [
+        ("group", "grouped"),
+        ("group_nostd", "grouped"),
+        ("group_loo", "grouped"),
+        ("batch", "grouped"),
+        ("gae", "single"),
+        ("gae", "grouped"),
+        ("gae_priv", "grouped"),
+    ],
 )
 def test_every_arm_finds_the_known_optimum(advantage: str, collect: str) -> None:
     """The best policy reveals ``signal`` and stops: return 0.8. Each arm gets close."""
     problem = toy_problem()
     settings = PGSettings(
-        advantage=advantage, collect=collect, lr=3e-3, epochs=2, minibatch=128,
-        batch_episodes=256, group_size=8,
+        advantage=advantage,
+        collect=collect,
+        lr=3e-3,
+        epochs=2,
+        minibatch=128,
+        batch_episodes=256,
+        group_size=8,
     )
     record = _train(problem, settings, updates=60)
     assert record["ret"] > 0.7, record
@@ -348,9 +425,11 @@ def test_trl_trainer_runs_under_the_budget_harness() -> None:
     problem = toy_problem()
     problem.info = {}
     record = run_arm(
-        problem, "mc",
+        problem,
+        "mc",
         {"n_rollouts": 2, "max_depth": 2, "update_every": 10, "policy_lr": 1e-2},
-        budget=4e7, n_checkpoints=4,
+        budget=4e7,
+        n_checkpoints=4,
     )
     final = record["final"]
     assert final["compute"] <= 4e7

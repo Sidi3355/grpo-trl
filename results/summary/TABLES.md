@@ -383,6 +383,36 @@ Difference in (return - random) / (clairvoyant bound - random); no condition dro
 | grpo       | -0.119 | 0.218 | 0.269 | 0.449 | 0.306 |
 | grpo_nostd |  1.112 | 1.253 | 1.203 | 1.107 | 1.242 |
 
+## E4. Four times the budget: normalised test return, mean [95% CI]
+
+| condition      | TRL shipped (defaults)   | TRL shipped (tuned)   | PPO               | GRPO (canonical)     | GRPO (mean-centred)   |
+|:---------------|:-------------------------|:----------------------|:------------------|:---------------------|:----------------------|
+| synth-route/R1 | 1.44 [1.44, 1.44]        | -0.04 [-0.04, -0.04]  | 1.52 [1.52, 1.52] | 1.55 [1.55, 1.55]    | 0.19 [0.19, 0.19]     |
+| founders/R1    | 0.88 [0.88, 0.88]        | 0.72 [0.72, 0.72]     | 1.00 [1.00, 1.00] | 1.02 [1.02, 1.02]    | 0.62 [0.62, 0.62]     |
+| synth-route/R2 | 0.16 [0.16, 0.16]        | 1.99 [1.99, 1.99]     | 2.40 [2.40, 2.40] | -0.52 [-0.52, -0.52] | 1.32 [1.32, 1.32]     |
+| founders/R2    | -0.86 [-0.86, -0.86]     | 0.32 [0.32, 0.32]     | 0.13 [0.13, 0.13] | 0.54 [0.54, 0.54]    | 0.48 [0.48, 0.48]     |
+
+### The same conditions and seeds at one and at four times the budget (pooled)
+
+| arm                    | 1x budget         |   1x budget: slots | 4x budget         |   4x budget: slots |
+|:-----------------------|:------------------|-------------------:|:------------------|-------------------:|
+| TRL shipped (defaults) | 0.38 [0.38, 0.38] |              2.041 | 0.40 [0.40, 0.40] |              2.064 |
+| TRL shipped (tuned)    | 0.51 [0.51, 0.51] |              2.714 | 0.75 [0.75, 0.75] |              2.699 |
+| PPO                    | 1.24 [1.24, 1.24] |              2.729 | 1.26 [1.26, 1.26] |              3.067 |
+| GRPO (canonical)       | 0.79 [0.79, 0.79] |              2.193 | 0.65 [0.65, 0.65] |              2.137 |
+| GRPO (mean-centred)    | 1.34 [1.34, 1.34] |              2.468 | 0.65 [0.65, 0.65] |              2.681 |
+
+### Pairwise at four times the budget (descriptive)
+
+| comparison                                   | regimes   | difference              |     p | P(improvement)    | conditions won/tied/lost   |
+|:---------------------------------------------|:----------|:------------------------|------:|:------------------|:---------------------------|
+| GRPO (mean-centred) - TRL shipped (defaults) | R1+R2     | +0.251 [+0.251, +0.251] | 0.875 | 0.50 [0.50, 0.50] | 2/0/2                      |
+| GRPO (mean-centred) - TRL shipped (tuned)    | R1+R2     | -0.096 [-0.096, -0.096] | 0.876 | 0.50 [0.50, 0.50] | 2/0/2                      |
+| PPO - TRL shipped (defaults)                 | R1+R2     | +0.861 [+0.861, +0.861] | 0.126 | 1.00 [1.00, 1.00] | 4/0/0                      |
+| PPO - TRL shipped (tuned)                    | R1+R2     | +0.514 [+0.514, +0.514] | 0.249 | 0.75 [0.75, 0.75] | 3/0/1                      |
+| GRPO (mean-centred) - PPO                    | R1+R2     | -0.610 [-0.610, -0.610] | 0.249 | 0.25 [0.25, 0.25] | 1/0/3                      |
+| GRPO (canonical) - PPO                       | R1+R2     | -0.612 [-0.612, -0.612] | 1.000 | 0.75 [0.75, 0.75] | 3/0/1                      |
+
 ## E5. End to end through `VerifiableRL.fit` (classifier co-trained)
 
 Shipped arms: three passes of rollouts. Group arms: one pass. Mean over seeds.
