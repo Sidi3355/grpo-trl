@@ -64,7 +64,18 @@ def load_runs(exp: str) -> pd.DataFrame:
         rows.append(row)
     frame = pd.DataFrame(rows)
     frame["condition"] = frame["dataset"] + "/" + frame["regime"]
-    return frame
+    return _ordered(frame)
+
+
+def _ordered(frame: pd.DataFrame) -> pd.DataFrame:
+    """Rows in the plan's order: regime, then dataset, then arm and seed."""
+    from .configs import DATASETS
+
+    rank = {name: i for i, name in enumerate(DATASETS)}
+    keys = pd.DataFrame({
+        "r": frame["regime"], "d": frame["dataset"].map(rank), "a": frame["arm"], "s": frame["seed"],
+    })
+    return frame.loc[keys.sort_values(["r", "d", "a", "s"]).index].reset_index(drop=True)
 
 
 def load_curves(exp: str) -> pd.DataFrame:
@@ -90,7 +101,9 @@ def load_curves(exp: str) -> pd.DataFrame:
             })
     frame = pd.DataFrame(rows)
     frame["condition"] = frame["dataset"] + "/" + frame["regime"]
-    return frame
+    rank = {condition: i for i, condition in enumerate(dict.fromkeys(load_runs(exp)["condition"]))}
+    order = frame["condition"].map(rank).sort_values(kind="stable").index
+    return frame.loc[order].reset_index(drop=True)
 
 
 DEGENERATE_SHARE = 0.05  # of the headroom (Amendment A2.1)

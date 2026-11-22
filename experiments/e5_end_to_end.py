@@ -7,10 +7,10 @@ API: construct, ``fit``, ``predict_proba``, ``decision_paths``.
     python experiments/e5_end_to_end.py [--workers 4]
 
 Arms:
-    shipped         ``VerifiableRL`` with the library's defaults (one pass of rollouts)
-    shipped_tuned   the rollout optimiser with the settings tuned in this study
-    group           ``optimizer="group"`` with its defaults, ``n_iterations`` set so
-                    that a fit takes no more compute than the shipped default's
+    shipped         ``VerifiableRL`` with the library's defaults, three passes of rollouts
+    shipped_tuned   the rollout optimiser with the settings tuned in this study, three passes
+    group           ``optimizer="group"`` with the settings frozen for mean-centred GRPO,
+                    one pass (about the compute of three default rollout passes, or less)
 The classifier is pretrained with the dataset's selected ``_pretrain`` settings
 and then co-trained with TRL's defaults in every arm.
 """
@@ -32,9 +32,10 @@ SEEDS = range(5)
 def arms() -> dict[str, dict[str, Any]]:
     frozen = json.loads((HERE / "frozen_configs.json").read_text())
     tuned = {k: v for k, v in frozen["arms"]["mc_tuned"][1].items() if k != "min_queries_frac"}
+    passes = {"n_iterations": frozen["e5_shipped_n_iterations"]}
     return {
-        "shipped": {},
-        "shipped_tuned": {**tuned, "_frac": frozen["arms"]["mc_tuned"][1].get("min_queries_frac")},
+        "shipped": {**passes},
+        "shipped_tuned": {**tuned, **passes, "_frac": frozen["arms"]["mc_tuned"][1].get("min_queries_frac")},
         "group": {"optimizer": "group", **frozen["e5_group"]},
     }
 

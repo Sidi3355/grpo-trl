@@ -149,6 +149,12 @@ def main() -> None:
         analysis.save_table(all_pairs, "e1_pairwise")
         out += ["## E1. Pairwise differences in normalised test return (descriptive; unadjusted p)", "",
                 _md(all_pairs), ""]
+        everywhere = e1.assign(norm=e1["headroom_share"], degenerate=False)
+        headroom = pd.concat([pairwise(everywhere, pairs, r) for r in (("R1", "R2"), ("R1",), ("R2",))])
+        analysis.save_table(headroom, "e1_pairwise_headroom")
+        out += ["## E1. Sensitivity: all twelve conditions, returns as a share of headroom", "",
+                "Difference in (return - random) / (clairvoyant bound - random); no condition dropped.", "",
+                _md(headroom, digits=4), ""]
         endpoint = pd.concat([pairwise(e1.assign(norm=e1["norm_valbest"]), pairs[:3], r) for r in (("R1", "R2"),)])
         out += ["## E1. Sensitivity: validation-selected checkpoint instead of the last", "", _md(endpoint), ""]
         for metric, label in (("test_n_slots", "slots revealed"), ("test_cost", "acquisition cost"),
@@ -218,6 +224,33 @@ def main() -> None:
         ).reset_index()
         analysis.save_table(summary, "e5_summary")
         out += ["## E5. End to end through `VerifiableRL.fit` (classifier co-trained)", "", _md(summary), ""]
+
+    if _exists("e6"):
+        records = [json.loads(p.read_text()) for p in sorted((RESULTS / "raw" / "e6").glob("*.json"))]
+        rows = []
+        for r in records:
+            row = {"condition": f"{r['dataset']}/{r['regime']}", "seed": r["seed"],
+                   "groups whose episodes all end in the same call": r["share_groups_same_call"]}
+            row.update({f"cos: {k}": v for k, v in r["cosine_to_reference"].items() if k != "reference"})
+            short, long_ = min(r["mean_advantage_by_reveals"]["grpo"], key=int), max(r["mean_advantage_by_reveals"]["grpo"], key=int)
+            for rule in ("reference", "grpo"):
+                row[f"advantage of shortest episodes: {rule}"] = r["mean_advantage_by_reveals"][rule][short]
+                row[f"advantage of longest episodes: {rule}"] = r["mean_advantage_by_reveals"][rule][long_]
+            rows.append(row)
+        e6 = pd.DataFrame(rows)
+        analysis.save_table(e6, "e6_runs")
+        by_condition = e6.drop(columns="seed").groupby("condition", sort=False).mean().reset_index()
+        overall = by_condition.drop(columns="condition").mean().to_frame().T
+        overall.insert(0, "condition", "mean over conditions")
+        e6_table = pd.concat([by_condition, overall], ignore_index=True)
+        analysis.save_table(e6_table, "e6_gradient_bias")
+        cosines = [c for c in e6_table.columns if c.startswith("cos: ")]
+        out += ["## E6. Direction of each advantage rule's update at the initial policy (exploratory)", "",
+                "Cosine with the true policy gradient (per-sample mean baseline, no rescaling), mean over 3 seeds.", "",
+                _md(e6_table[["condition", *cosines, "groups whose episodes all end in the same call"]], digits=2), "",
+                "Mean advantage (each rule scaled to unit standard deviation) of the shortest and the longest episodes:", "",
+                _md(e6_table[["condition"] + [c for c in e6_table.columns if c.startswith("advantage of")]], digits=2), ""]
+        key["e6"] = json.loads(overall.to_json(orient="records"))[0]
 
     tests = analysis.confirmatory(frames)
     if len(tests):
