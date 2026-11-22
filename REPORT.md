@@ -1,0 +1,451 @@
+# Is GRPO a better policy optimiser than PPO for Think-Reason-Learn?
+
+A pre-registered study on `VerifiableRL`, the reinforcement-learning model of Vela Research's
+[Think-Reason-Learn](https://github.com/Vela-Research/think-reason-learn) (TRL).
+22 November 2026. Plan: [`PLAN.md`](PLAN.md). Method in full: [`docs/METHODS.md`](docs/METHODS.md).
+Every number below is read off [`results/summary/TABLES.md`](results/summary/TABLES.md), which one command
+regenerates from the raw run records.
+
+## Summary
+
+**The question.** TRL was believed to train its RL model with Proximal Policy Optimization (PPO). Would Group
+Relative Policy Optimization (GRPO) do better?
+
+**The premise was wrong, and that changes the question.** TRL does not use PPO. Its `VerifiableRL` trains the
+policy by distilling Monte Carlo rollout targets: no policy gradient, no critic, no clipped objective. So three
+optimisers were compared on TRL's own decision problem, with TRL's own networks, rewards and deployment code:
+what TRL ships, PPO, and GRPO.
+
+**The answers.**
+
+| Question | Answer | Evidence (pooled paired difference in normalised test return, 95% CI) |
+|---|---|---|
+| Is GRPO, as published, better than PPO? | **No. It is clearly worse.** | -0.50 [-0.59, -0.41]; PPO wins 8 of 12 conditions, loses 1 |
+| Is GRPO, as published, better than what TRL ships? | **No.** About equal overall; worse where stopping matters | 0.00 [-0.12, +0.12] overall; -0.31 [-0.53, -0.09] in the cost-aware regime |
+| Is there a GRPO that works here? | **Yes: drop the division by the group's standard deviation** ("mean-centred GRPO") | +0.42 [+0.32, +0.50] over canonical GRPO |
+| Is mean-centred GRPO better than PPO? | **No. Slightly behind, or tied.** | -0.09 [-0.15, -0.02] on the pre-registered scale; -0.01 [-0.03, +0.01] on the all-conditions scale |
+| Are PPO and mean-centred GRPO better than what TRL ships? | **Yes, both, by a wide margin.** | PPO +0.50 [+0.40, +0.60]; mean-centred GRPO +0.41 [+0.30, +0.53]; each wins 9 of 12 conditions |
+
+Normalised return: 0 is a random policy, 1 is the best policy that does not adapt to what it sees. Pooled over
+six datasets, two reward regimes and ten seeds, at equal compute: **PPO 1.10, mean-centred GRPO 1.01, TRL's
+optimiser 0.60 (tuned) and 0.49 (as shipped), canonical GRPO 0.60.**
+
+**Five findings.**
+
+1. **GRPO does not beat PPO.** The pre-registered hypothesis H1 was not just unsupported; it was reversed.
+2. **Canonical GRPO has a specific defect in this problem, and one line fixes it.** Dividing each sample's
+   advantages by that sample's own standard deviation gives a sample whose episodes differ only by a slot cost
+   the same weight as a sample whose episodes differ by a right or a wrong call. At the initial policy, canonical
+   GRPO's update points, on average, at a cosine of 0.24 from the true policy gradient (0.99 without the
+   division), and it learns to stop as early as it is allowed to.
+3. **Per-sample grouping does what the prior literature hoped for.** In classical control, where groups mix
+   unrelated episodes, critic-free GRPO loses badly to PPO. Here every training sample is a natural "prompt", and a
+   critic-free method with per-sample groups comes within 0.09 of PPO.
+4. **The larger result is about TRL, not about GRPO vs PPO.** Either policy-gradient method beats TRL's
+   rollout-distillation optimiser at equal compute, in about half the wall-clock time, with fewer failed runs
+   (4% and 8% of runs end below the random policy, against 21% to 23%).
+5. **TRL's optimiser cannot learn when to stop.** Its STOP target is "was the call right, if I stopped now",
+   so slot costs and step penalties never reach the stopping decision. In the cost-aware regime it reveals exactly
+   its minimum number of slots on every dataset.
+
+**Recommendation.** Offer a whole-episode policy-gradient optimiser in `VerifiableRL`. The pre-registered rule
+selects mean-centred GRPO (it passed both of its tests against the shipped optimiser), and it is the smaller
+change: no third network, three new settings. PPO scored 0.09 higher and is the stronger choice if a critic is
+acceptable. Canonical GRPO should not be offered. A TRL-native implementation (`optimizer="group"`) with tests is
+in [`contrib/trl`](contrib/trl/README.md); it passes TRL's lint, strict type-check and full test suite.
+
+**What this study cannot say.** Ten seeds resolve differences of about 0.17 or more; the 0.09 between PPO and
+mean-centred GRPO is at the edge of that. The classifier was frozen in the main experiment (the end-to-end check
+in section 4.8 relaxes this). The founder data is generated, and VCBench was not available, so nothing here is a
+claim about real founders.
+
+---
+
+## 1. The question and its premise
+
+The question as asked: *one of TRL's six models uses PPO; is GRPO a better alternative?*
+
+A code audit came first. TRL has one reinforcement-learning model, `VerifiableRL`
+(Ye, Alican, Griffin, Yin and Ihlamur, "Learning What to Ask: Cost-Aware Sequential Founder Evaluation",
+MIDAS @ ECML-PKDD 2026). The string "PPO" appears nowhere in the library, its tests, its documentation or its git
+history (upstream `a712645`, v0.4.4; the module is byte-identical in the v0.3.0 fork). What the code does:
+
+- A sample's features come in named *slots* (education, jobs, ...). A policy network picks the next slot to
+  reveal, or STOP; a classifier network predicts the label from what has been revealed.
+- For each state an episode visits, each slot is revealed in turn and the current policy is rolled out
+  `n_rollouts` times. The policy is then fitted by cross-entropy to `softmax(Q / tau_info)` over slots, and to
+  `sigmoid(Q_stop / tau_stop)` for STOP, where `Q_stop` is the reward of stopping *now*.
+
+That is rollout-based policy distillation. It is not a policy-gradient method.
+
+So the study compares three families on one problem: TRL's shipped optimiser, PPO, and GRPO. The paper itself
+could not be read (its host was unreachable and it is not on arXiv); the audit is of the code, which TRL's
+changelog says was checked against the paper.
+
+## 2. Background
+
+**PPO** (Schulman et al., 2017) is an actor-critic method: a learned value function supplies per-step
+advantages, and the policy is improved on a clipped importance-weighted objective.
+
+**GRPO** (Shao et al., 2024, DeepSeekMath) removes the critic. For each prompt it samples a group of G outputs
+and scores each against its own group: `A_i = (r_i - mean(r)) / std(r)`, inside PPO's clipped objective.
+
+**Outside language models, the evidence was against GRPO.** de Oliveira et al. (2025; AKCIT and OATML, Oxford)
+found it underperforms PPO on Acrobot, MountainCar, HalfCheetah and Humanoid and holds its own only on
+short-horizon CartPole. They gave two reasons: no per-step credit assignment over long horizons, and groups that
+"mix potentially unrelated episodes", because classical control has no prompt.
+
+**Why `VerifiableRL` looked like the right place for GRPO** (section 2.3 of the plan, written before any run):
+each training sample is a natural prompt; episodes are at most five steps; the reward arrives at the end. And
+the return depends on the label, which the policy never sees, so a critic `V(s)` cannot remove the variance the
+hidden label causes, while a group of episodes on the same sample shares the label and removes it exactly.
+
+## 3. Method in brief
+
+Everything that defines the task is imported from TRL and identical for every arm: the policy and classifier
+networks and their initialisation, the action rule, the reward, the deployment loop (`VerifiableRL._reveal`).
+Only the policy optimiser varies. Details and code pointers are in [`docs/METHODS.md`](docs/METHODS.md).
+
+- **Arms.** *TRL shipped (defaults)* and *TRL shipped (tuned)*: TRL's own trainer code, under a budget harness.
+  *PPO*: clipped objective, learned critic, GAE. *GRPO (canonical)*: equation 3 of Shao et al., per-sample
+  groups. *GRPO (mean-centred)*: the same without the division by the group's standard deviation (promoted from
+  ablation arm to main arm, with its own hypotheses, after the pilot and before tuning: Amendment A1.3).
+- **Two reward regimes.** *R1* is the library's defaults exactly (TP +4, FP -16, step -0.1, at least three
+  slots, no slot costs). *R2* is a cost-aware regime built from existing `VerifiableRL` arguments: the return is
+  balanced accuracy (as Youden's J) minus slot costs, STOP is allowed after one slot, and revealing everything
+  costs half of what full information is worth.
+- **Six datasets:** a synthetic problem whose best strategy is adaptive and known; the 3,000 founder profiles of
+  `trl-for-angels` (six text slots, MiniLM embeddings); Kickstarter projects; job postings (4% fraudulent);
+  credit default (one slot per month of history); census income. Fresh stratified split per seed (2,000 train,
+  500 validation, 2,000 test).
+- **Equal compute.** Every run gets the compute TRL's default trainer spends on one pass over the training set,
+  counted in multiply-accumulates by hooks on every network, PPO's critic included. The endpoint is the policy
+  at the end of the budget; no checkpoint is selected.
+- **Equal tuning.** 24 random configurations per learner on dev seeds, the top three re-run on two more dev
+  seeds, one frozen configuration per learner for all datasets and regimes. The incumbent got the same search,
+  plus the right to set its own `min_queries`.
+- **Frozen classifier.** The reward depends on the classifier, so in the main experiment it is trained once per
+  (dataset, seed) by TRL's own pretraining and frozen for every arm. Section 4.8 removes this.
+- **Statistics.** Runs are paired by seed. Each confirmatory test is the mean paired difference in normalised
+  test return, pooled over conditions with equal weight: stratified bootstrap CI, sign-flip permutation p,
+  Holm correction over eight tests.
+- **Pre-registration.** Hypotheses, metrics, analysis and decision rule were committed before any experiment
+  (`39ac496`); pilot-driven changes before tuning (`2c9c9ff`); frozen configurations before any confirmatory seed
+  (`0ea0647`). Dev seeds (1000+) and confirmatory seeds (0 to 9) never mix. Deviations:
+  [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md).
+
+## 4. Results
+
+### 4.1 Main comparison (E1: 5 arms x 12 conditions x 10 seeds = 600 runs)
+
+![Normalised test return by arm and condition](results/figures/fig1_main_results.png)
+
+Normalised test return, mean over seeds with 95% CI. 0 = random policy, 1 = best fixed set of slots.
+
+| Condition | TRL shipped (defaults) | TRL shipped (tuned) | PPO | GRPO (canonical) | GRPO (mean-centred) |
+|---|---|---|---|---|---|
+| synthetic routing, R1 | 1.09 [0.91, 1.29] | 0.69 [0.30, 1.03] | 1.48 [1.38, 1.57] | 1.56 [1.48, 1.63] | 1.56 [1.46, 1.65] |
+| founders, R1 | 0.77 [0.52, 1.00] | 0.48 [0.05, 0.86] | 1.01 [0.71, 1.25] | 0.81 [0.51, 1.08] | 0.96 [0.72, 1.16] |
+| kickstarter, R1 | 0.75 [0.37, 1.18] | 0.50 [0.10, 0.95] | 1.22 [0.77, 1.73] | 0.77 [0.36, 1.20] | 1.02 [0.61, 1.48] |
+| job postings, R1 | 0.37 [-0.15, 0.77] | 0.70 [0.19, 1.05] | 0.68 [0.45, 0.90] | 0.38 [-0.04, 0.76] | 0.45 [0.02, 0.85] |
+| credit, R1 | 0.80 [0.67, 0.93] | 0.74 [0.61, 0.89] | 1.13 [1.01, 1.25] | 0.91 [0.80, 1.02] | 0.98 [0.88, 1.08] |
+| census income, R1 | 0.55 [0.25, 0.85] | 0.56 [0.21, 0.93] | 1.49 [1.31, 1.67] | 1.09 [0.84, 1.32] | 1.42 [1.22, 1.61] |
+| synthetic routing, R2 | -0.22 [-0.43, -0.01] | 1.10 [0.67, 1.47] | 1.42 [1.20, 1.64] | 0.28 [-0.13, 0.72] | **2.05 [1.73, 2.26]** |
+| founders, R2 | -0.22 [-0.69, 0.29] | -0.17 [-0.71, 0.36] | 0.82 [0.43, 1.20] | 0.48 [-0.01, 0.96] | 0.73 [0.28, 1.14] |
+| kickstarter, R2 | 0.13 [-0.30, 0.48] | 0.72 [0.08, 1.25] | 0.70 [0.34, 1.05] | -0.22 [-0.49, 0.10] | 0.01 [-0.29, 0.33] |
+| job postings, R2 | 0.82 [0.49, 1.08] | 0.29 [-0.14, 0.67] | 0.98 [0.86, 1.08] | 0.76 [0.44, 1.02] | 0.89 [0.73, 1.07] |
+| credit, R2 | 0.17 [-0.45, 0.77] | 0.73 [0.36, 1.06] | 1.13 [0.92, 1.30] | -0.33 [-0.84, 0.27] | 1.12 [0.92, 1.30] |
+| census income, R2 | 0.89 [0.55, 1.15] | 0.83 [0.59, 1.09] | 1.09 [0.93, 1.26] | 0.65 [0.46, 0.84] | 0.93 [0.73, 1.12] |
+
+Pooled over the twelve conditions (none was dropped by the degeneracy guard):
+
+| Arm | Normalised return [95% CI] | Interquartile mean | R1 | R2 | Seed-to-seed SD | Runs below random | Runs above best fixed set | Wall-clock per run |
+|---|---|---|---|---|---|---|---|---|
+| TRL shipped (defaults) | 0.49 [0.39, 0.60] | 0.62 | 0.72 | 0.26 | 0.57 | 23% | 24% | 38 s |
+| TRL shipped (tuned) | 0.60 [0.48, 0.71] | 0.71 | 0.61 | 0.58 | 0.67 | 21% | 28% | 41 s |
+| **PPO** | **1.10 [1.02, 1.17]** | 1.14 | 1.17 | 1.03 | 0.40 | 4% | 65% | 17 s |
+| GRPO (canonical) | 0.60 [0.50, 0.70] | 0.69 | 0.92 | 0.27 | 0.54 | 23% | 37% | 23 s |
+| **GRPO (mean-centred)** | **1.01 [0.93, 1.09]** | 1.04 | 1.07 | 0.96 | 0.43 | 8% | 52% | 21 s |
+
+What the table shows:
+
+- **PPO and mean-centred GRPO are the only arms that, on average, beat the best non-adaptive policy** (above 1).
+- **Canonical GRPO is fine in R1 and fails in R2** (0.92 against 0.27). Section 4.4 explains why.
+- **Tuning did not rescue TRL's optimiser.** The tuned configuration helps in R2 (0.26 to 0.58, almost all of it
+  from being allowed a `min_queries` of two) and hurts in R1 (0.72 to 0.61). Against the *better* of the two TRL
+  arms in each regime, PPO is ahead by 0.45 (R1) and 0.44 (R2), and mean-centred GRPO by 0.34 [0.26, 0.43] (R1)
+  and 0.37 [0.18, 0.57] (R2).
+- **On the one problem with a known adaptive optimum, mean-centred GRPO finds it and nothing else does.** On
+  synthetic routing in R2 the best strategy is: read the router, read the candidate it names, stop. Mean-centred
+  GRPO reveals 2.16 slots on average and scores 2.05; PPO reveals 3.99 and scores 1.42; TRL's tuned optimiser
+  1.10; canonical GRPO 0.28.
+- **The equal-compute budget is conservative for the new arms.** At equal multiply-accumulates they finish in
+  about half the wall-clock time of TRL's trainer, because whole episodes batch better than per-state rollouts.
+
+![Learning curves](results/figures/fig3_learning_curves.png)
+
+The policy-gradient arms reach the level of the best fixed slot set within a quarter of the budget in R1. TRL's
+default optimiser is still climbing when the budget ends; section 4.7 gives it four times as much.
+
+### 4.2 The confirmatory tests
+
+Pooled paired difference in normalised test return (first arm minus second). 95% CI: bootstrap stratified by
+condition. p: sign-flip permutation test, Holm-adjusted over the eight tests. P(improvement): share of paired seeds
+the first arm wins. W/T/L: conditions whose own 95% CI lies above, across, below zero.
+
+| Test | Claim | Conditions x seeds | Difference [95% CI] | Holm p | P(improvement) | W/T/L | Verdict |
+|---|---|---|---|---|---|---|---|
+| H1 | GRPO (canonical) beats PPO | 12 x 10 | -0.50 [-0.59, -0.41] | 0.0008 | 0.23 | 1/3/8 | **reversed** |
+| H2a | GRPO (canonical) beats TRL tuned, R2 | 6 x 10 | -0.31 [-0.53, -0.09] | 0.063 | 0.35 | 2/1/3 | not supported |
+| H2b | GRPO (canonical) non-inferior to TRL tuned, R1 (margin 0.10) | 6 x 10 | +0.31 [+0.20, +0.42] | 0.0008 | 0.80 | 4/1/1 | **supported** |
+| H3 | Per-sample groups beat batch groups (canonical pair) | 4 x 10 | -0.85 [-1.06, -0.61] | 0.0008 | 0.25 | 0/2/2 | **reversed** |
+| H4 | Mean-centred and z-scored GRPO differ (guess: mean-centred better) | 4 x 10 | +0.94 [+0.73, +1.14] | 0.0008 | 0.86 | 3/1/0 | **supported** |
+| H1' | GRPO (mean-centred) beats PPO | 12 x 10 | -0.09 [-0.15, -0.02] | 0.063 | 0.42 | 2/7/3 | not supported |
+| H2a' | GRPO (mean-centred) beats TRL tuned, R2 | 6 x 10 | +0.37 [+0.18, +0.57] | 0.012 | 0.70 | 4/1/1 | **supported** |
+| H2b' | GRPO (mean-centred) non-inferior to TRL tuned, R1 (margin 0.10) | 6 x 10 | +0.46 [+0.35, +0.56] | 0.0008 | 0.87 | 5/1/0 | **supported** |
+
+H1 to H4 were registered before any experiment; H1', H2a' and H2b' were added in Amendment A1, after a pilot on
+one dev seed and before tuning. Of the four original hypotheses, two came out the opposite way to the prediction.
+
+![Confirmatory tests](results/figures/fig2_hypotheses.png)
+
+- **H1 is reversed.** Canonical GRPO does not beat PPO; PPO beats it, in both regimes.
+- **H2a is not supported; H2b is.** Against TRL's tuned optimiser, canonical GRPO is worse in the cost-aware
+  regime and better in the default regime.
+- **H3 is reversed, and H4 is supported** (section 4.4): with canonical GRPO's settings, per-sample z-scored
+  advantages do far worse than a plain batch baseline, and removing the division by the standard deviation is
+  what repairs them.
+- **H1' is not supported.** Mean-centred GRPO does not beat PPO. The estimate is -0.09 in PPO's favour, with a CI
+  that excludes zero before the multiplicity correction and not after it. On the all-conditions sensitivity scale
+  (share of headroom) the difference is -0.01 [-0.03, +0.01]. The fair summary is "tied or slightly behind".
+- **H2a' and H2b' are supported.** Mean-centred GRPO beats TRL's tuned optimiser in the cost-aware regime and is
+  not merely non-inferior but superior in the default regime.
+
+Sensitivity analyses, all in [`TABLES.md`](results/summary/TABLES.md):
+
+- *Validation-selected checkpoint instead of the last:* mean-centred GRPO minus TRL tuned +0.26 [+0.18, +0.35];
+  minus PPO -0.07 [-0.14, 0.00]. Same conclusions; checkpoint selection helps TRL's optimiser most, because its
+  runs fluctuate most.
+- *Share of headroom, no condition dropped:* mean-centred GRPO minus TRL tuned +0.12 [+0.09, +0.15]; PPO minus
+  TRL tuned +0.13 [+0.10, +0.16]; canonical GRPO minus PPO -0.10 [-0.13, -0.08].
+- *Matched environment transitions (PPO's critic free of charge):* at equal compute PPO already used more
+  transitions than mean-centred GRPO (133k against 96k per run), so charging nothing for the critic changes
+  nothing; canonical GRPO read at PPO's transition count is at -0.56 [-0.65, -0.47].
+
+### 4.3 What the learned policies do
+
+Slots revealed per test sample (mean over seeds):
+
+| Condition | TRL shipped (defaults) | TRL shipped (tuned) | PPO | GRPO (canonical) | GRPO (mean-centred) |
+|---|---|---|---|---|---|
+| R1, all six datasets (range) | 3.02 to 3.34 | 3.06 to 3.83 | 3.00 to 3.42 | 3.00 | 3.00 to 3.06 |
+| synthetic routing, R2 | 1.00 | 2.26 | 3.99 | 1.61 | 2.16 |
+| founders, R2 | 1.00 | 2.05 | 1.52 | 1.46 | 1.76 |
+| kickstarter, R2 | 1.01 | 2.33 | 2.26 | 1.01 | 1.13 |
+| job postings, R2 | 1.01 | 2.12 | 1.73 | 1.09 | 1.16 |
+| credit, R2 | 1.00 | 2.04 | 1.23 | 1.15 | 1.16 |
+| census income, R2 | 1.00 | 2.04 | 1.21 | 1.19 | 1.13 |
+
+- **TRL's optimiser stops at its minimum.** As shipped, one slot in R2 on every dataset; tuned, where it chose a
+  floor of two, almost exactly two. It does not learn when to stop; it learns which slot to ask first. This is by
+  design: the STOP target scores the call made now and never compares it with the value of continuing, and the
+  greedy rule compares P(STOP) with P(continue) *times* the best slot's share, which STOP wins whenever its
+  probability is near one half.
+- **PPO and mean-centred GRPO vary the number of slots with the dataset**, from 1.1 to 4.0.
+- **Prediction quality moves with the return in R2 and can move against it in R1.** In R2, F0.5 on synthetic
+  routing is 0.82 for PPO and mean-centred GRPO against 0.67 and 0.46 for the two TRL arms; on credit 0.49 and
+  0.51 against 0.47 and 0.41. In R1 on founders, PPO's return is highest and its F0.5 is lowest (0.15 against
+  0.24), because it calls fewer founders positive (2.5% against 4% to 6%). Section 5.3 explains why a better
+  optimiser does that under the default reward.
+
+### 4.4 Why canonical GRPO fails here (E6, exploratory; E2, confirmatory)
+
+**The mechanism (E6).** No training is involved here. At the initial policy, 16 episodes were played for every
+training sample, and the direction each advantage rule would push the policy was compared with the true policy
+gradient (the plain score-function gradient with a per-sample mean baseline).
+
+| Advantage rule | Cosine with the true policy gradient (mean over 12 conditions, 3 seeds) | Range over conditions |
+|---|---|---|
+| Per-sample mean and std (GRPO, canonical) | **0.24** | -0.86 to 0.69 |
+| The same without length normalisation | 0.22 | -0.87 to 0.71 |
+| Per-sample mean (GRPO, mean-centred) | **0.99** | 0.98 to 1.00 |
+| Batch mean and std | 0.98 | 0.96 to 1.00 |
+| No baseline | 0.75 | 0.33 to 0.99 |
+
+Canonical GRPO's update is close to orthogonal to the gradient of the expected return, and on synthetic routing
+in R1 it points the opposite way (-0.86). The reason is visible in the same data. **In 39% of groups every
+episode ends in the same call**, right or wrong, so the group's returns differ only by slot costs or step
+penalties: a spread of a few hundredths. Dividing by that spread turns a difference of one step penalty (0.1)
+into an advantage as large as the difference between a true positive and a false positive (20). The table shows
+what that does to the shortest and the longest episodes in a group (advantages scaled to unit standard deviation):
+
+| | Shortest episodes | Longest episodes |
+|---|---|---|
+| True advantage, R1 (mean of six datasets) | +0.00 | +0.01 |
+| Canonical GRPO's advantage, R1 | **+0.36** | **-1.32** |
+
+Under the default reward, stopping early or late is close to neutral in truth; canonical GRPO sees a strong
+reason to stop as early as allowed. In R1 that is harmless, because three slots is about right anyway, which is
+why canonical GRPO reveals exactly 3.00 slots on every R1 dataset and scores 0.92. In R2, where one slot is
+allowed and rarely enough, the same pull is why it scores 0.27. In language-model training the rewards GRPO was
+designed for are typically right-or-wrong, a group that agrees has zero spread and contributes nothing, and the
+problem does not arise; it arises here because every episode carries small, real cost differences.
+
+**The ladder (E2: 8 arms x 4 conditions x 10 seeds = 320 runs).** Same data collection, same clipped objective,
+same settings (canonical GRPO's frozen configuration); only what the advantage is measured against changes.
+
+![Baseline ladder](results/figures/fig4_baseline_ladder.png)
+
+| Advantage | Normalised test return [95% CI] | Runs below random |
+|---|---|---|
+| Per-sample mean (GRPO, mean-centred) | **1.25 [1.13, 1.37]** | 5% |
+| Per-sample mean, no length normalisation (Dr. GRPO) | 1.24 [1.12, 1.35] | 8% |
+| Privileged critic V(state, all features, label) + GAE | 1.19 [1.04, 1.33] | 10% |
+| Batch mean and std (groups of unrelated episodes) | 1.16 [1.03, 1.29] | 13% |
+| Learned critic V(state) + GAE | 1.13 [0.96, 1.28] | 10% |
+| No baseline | 1.03 [0.85, 1.20] | 10% |
+| Per-sample mean and std (GRPO, canonical) | **0.31 [0.09, 0.54]** | 35% |
+| Per-sample leave-one-out mean, group std | 0.25 [0.05, 0.46] | 40% |
+
+- **H4, supported:** removing the division by the group's standard deviation is worth +0.94 [+0.73, +1.14].
+  Both arms that divide by it are at the bottom; every arm that does not is above 1.
+- **H3, reversed as registered:** canonical per-sample GRPO is 0.85 *below* the batch baseline. The registered
+  pair confounds grouping with the std division. The pair that isolates grouping (mean-centred against batch,
+  declared in A1.3) gives +0.10 [0.00, +0.20], unadjusted p = 0.09: per-sample grouping helps a little, and the
+  help is not established.
+- **The baseline matters much less than expected.** Among the six arms that work, the spread is 1.03 to 1.25.
+  The plan argued that a per-sample baseline should beat any critic because it sees the hidden label. The
+  direction is as predicted (per-sample mean 1.25, privileged critic 1.19, ordinary critic 1.13), and none of
+  those differences is significant: +0.06 [-0.01, +0.15] and +0.13 [+0.02, +0.26], unadjusted p = 0.16 and 0.06.
+  With episodes of one to five steps and a thousand episodes per update, variance is not what limits learning.
+- **Length normalisation is irrelevant here** (mean-centred minus Dr. GRPO: +0.02 [-0.03, +0.06]).
+- On these four conditions, with these settings, mean-centred GRPO is level with or ahead of the critic arms.
+  PPO's 0.09 lead in E1 comes from the other eight conditions and from each method's own tuned settings.
+
+### 4.5 Group size (E3)
+
+{{E3}}
+
+### 4.6 Four times the budget (E4)
+
+{{E4}}
+
+### 4.7 End to end, with the classifier co-trained (E5)
+
+{{E5}}
+
+## 5. Discussion
+
+### 5.1 GRPO versus PPO
+
+The question as asked has a clear answer: **in this problem GRPO is not a better optimiser than PPO.** As
+published it is much worse. With the standard deviation removed it is close, and it is the only method that
+found the adaptive optimum on the synthetic problem, but pooled over everything it is 0.09 behind PPO, a gap at
+the edge of what ten seeds resolve.
+
+This fits, and extends, the prior literature. de Oliveira et al. found that critic-free GRPO fails in classical
+control and suspected that grouping unrelated episodes was a cause. `VerifiableRL` offers the grouping they could
+not have (many episodes from one fixed sample), and with it the critic-free method nearly closes the gap to PPO.
+What it did not do is overtake PPO: the plan's argument that a per-sample baseline "should be stronger than any
+learned critic" was right about variance and wrong about the outcome. The ladder in section 4.4 tests that
+argument directly.
+
+### 5.2 What TRL should take from this
+
+The comparison that matters for the library is not GRPO against PPO. It is either of them against the optimiser
+TRL ships, and that comparison is not close: +0.41 and +0.50 normalised units at equal compute, in both regimes,
+with half the wall-clock time and a fifth to a third of the failed runs.
+
+Two properties of the shipped optimiser explain most of it.
+
+- **STOP is not learned from the return.** The target is a function of the immediate call only. Slot costs and
+  the step penalty cannot reach it, as the docstring of `targets` says. A policy-gradient method scores whole
+  episodes by their actual return, costs included.
+- **It spends its budget on rollouts.** One visited state costs `n_slots * n_rollouts` rollouts to label. A
+  whole-episode method learns from every decision of every episode it plays.
+
+### 5.3 A side finding about the default reward
+
+Under TRL's default reward a positive call earns +4 if right and -16 if wrong, and the classifier calls positive
+at probability 0.3. A positive call therefore pays on average only when it is right more than about 80% of the
+time (`16 / (16 + 4 + 0.25)`). On every real dataset here the classifier's positive calls are right far less
+often than that, so the mean return of *every* arm in R1 is negative, and the return-maximising policy is one
+whose reveals lead the classifier to call positive as rarely as possible. A better optimiser finds that policy
+more reliably, which is why PPO has the highest return and the lowest F0.5 on founders in R1. This is a property
+of the reward, not of any optimiser, and it is worth knowing when choosing `reward_fp` and `reward_threshold`:
+with the defaults, improving the policy can lower recall.
+
+## 6. Limitations
+
+- **Power.** The plan's target (90% power for a difference of 0.05) would need more than 100 seeds. With 10, the
+  pooled tests resolve differences of roughly 0.17 (all conditions) to 0.30 (one regime). The ranking of PPO and
+  mean-centred GRPO is therefore not settled; everything else is.
+- **Frozen classifier in the main experiment.** TRL co-trains the classifier. Section 4.7 checks the conclusion
+  survives co-training, on two datasets and five seeds, for the group optimiser only.
+- **One configuration per learner.** Tuned on four dev conditions and used everywhere. TRL's tuned configuration
+  turned out worse than its defaults in R1; the report therefore also compares against the better TRL arm per
+  regime.
+- **Data.** The founder profiles are generated; VCBench was not available; the other datasets are public
+  benchmarks cut into slots for this study. No claim is made about real founders or about accuracy in deployment.
+- **Scale.** 2,000 training samples, six or seven slots, small networks on a CPU. TRL's defaults are described as
+  suiting "thousands of samples".
+- **The paper was not read.** The incumbent is the code at `a712645`.
+- **New code against library code.** PPO and GRPO were written for this study. They are tested against
+  hand-computed advantages, against TRL's own returns, and on a problem with a known optimum, but they are one
+  implementation each.
+- **The normalised scale is noisy where the anchors are close** (`kickstarter` R2: random and the best fixed set
+  differ by 0.045). The headroom-scale analysis, which does not depend on that gap, agrees on every conclusion
+  except the size of the PPO to mean-centred GRPO difference.
+
+## 7. Recommendation and proposed contribution
+
+By the pre-registered decision rule (plan section 9, as extended in Amendment A1.3 before tuning): canonical
+GRPO failed H2a, so it is not recommended; mean-centred GRPO passed H2a' and H2b', so **the recommendation is to
+offer the mean-centred variant in `VerifiableRL`, and to say plainly that canonical GRPO is not suitable.**
+
+The rule did not anticipate PPO doing as well as it did. Stated without the rule: both PPO and mean-centred GRPO
+are large improvements on the shipped optimiser; PPO is ahead by a small and uncertain margin; mean-centred GRPO
+needs no critic network and three new settings. The contribution proposes the smaller change and says so.
+
+[`contrib/trl`](contrib/trl/README.md) holds a TRL-native implementation: `VerifiableRL(optimizer="group")`,
+written to TRL's contribution rules, default behaviour unchanged, with tests, a changelog entry and the text of
+a pull request. Under TRL's own lock file it passes `ruff check`, `ruff format --check`, `pyright` in strict
+mode with no errors, and the full offline test suite.
+
+## 8. The record
+
+| Commit | What it fixed in place |
+|---|---|
+| `39ac496` | The plan: hypotheses H1 to H4 with directions, the decision problem, arms, budget, metrics, statistics, decision rule. Before any experiment. |
+| `8335930` | The test bed and its tests. |
+| `2c9c9ff` | Amendment A1, after the pilot on one dev seed and before tuning: R2's reward made symmetric and the incumbent given its own `min_queries` (both in the incumbent's favour); mean-centred GRPO promoted to a main arm with hypotheses H1', H2a', H2b'. |
+| `0ea0647` | Amendment A2, after tuning and before any confirmatory seed: frozen configurations; the degeneracy guard's yardstick; the seed-count deviation; the secondary experiments. |
+| `56ce1ff` | E1's 600 raw run records. |
+
+Eight deviations from version 1 of the plan are listed in [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md), each
+with its reason and whom it could favour. The two that changed the decision problem were both made in the
+incumbent's favour.
+
+## 9. Reproducing
+
+[`docs/REPRODUCE.md`](docs/REPRODUCE.md). In short: `python -m pytest tests -q`, then
+`python -m grpo_trl.report` to rebuild every table and figure from the committed run records, or
+`python experiments/launch.py e1` (and the other stages) to re-run them.
+
+## References
+
+- Agarwal, Schwarzer, Castro, Courville, Bellemare (2021). *Deep Reinforcement Learning at the Edge of the
+  Statistical Precipice.* arXiv:2108.13264.
+- de Oliveira, Frujeri, Queiroz, Martins, Soares, Melo (2025). *Learning Without Critics? Revisiting GRPO in
+  Classical Reinforcement Learning Environments.* arXiv:2511.03527.
+- Liu, Chen, Li, Qi, Pang, Du, et al. (2025). *Understanding R1-Zero-Like Training: A Critical Perspective.*
+  arXiv:2503.20783. (Dr. GRPO.)
+- Schulman, Moritz, Levine, Jordan, Abbeel (2015). *High-Dimensional Continuous Control Using Generalized
+  Advantage Estimation.* arXiv:1506.02438.
+- Schulman, Wolski, Dhariwal, Radford, Klimov (2017). *Proximal Policy Optimization Algorithms.*
+  arXiv:1707.06347.
+- Shao, Wang, Zhu, Xu, Song, et al. (2024). *DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open
+  Language Models.* arXiv:2402.03300. (GRPO, section 4.1.)
+- Ye, Alican, Griffin, Yin, Ihlamur (2026). *Learning What to Ask: Cost-Aware Sequential Founder Evaluation.*
+  MIDAS @ ECML-PKDD 2026. (`VerifiableRL`; the code was audited, the paper could not be retrieved.)
+- Think-Reason-Learn, Vela Research. `github.com/Vela-Research/think-reason-learn`, commit `a712645` (v0.4.4).

@@ -1,3 +1,3 @@
 comparison,difference,p
-"GRPO (canonical) - PPO, at PPO's transition count","-0.593 [-0.655, -0.531]",0.0006999300069993001
-"GRPO (mean-centred) - PPO, at PPO's transition count","-0.080 [-0.100, -0.059]",0.31586841315868414
+"GRPO (canonical) - PPO, at PPO's transition count","-0.558 [-0.647, -0.467]",9.999000099990002e-05
+"GRPO (mean-centred) - PPO, at PPO's transition count","-0.086 [-0.153, -0.017]",0.04989501049895011

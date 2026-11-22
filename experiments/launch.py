@@ -147,7 +147,7 @@ def jobs_for(stage: str, args: argparse.Namespace) -> list[dict[str, Any]]:
                         jobs.append(_job("e2", dataset, regime, seed, name, arm))
         elif stage == "e3":
             for dataset, regime in configs.ABLATION_CONDITIONS:
-                for seed in range(10):
+                for seed in range(5):  # Amendment A2.5
                     for base in ("grpo", "grpo_nostd"):
                         for size in (2, 4, 8, 16, 32):
                             settings = {**arms[base][1], "group_size": size}
@@ -155,7 +155,7 @@ def jobs_for(stage: str, args: argparse.Namespace) -> list[dict[str, Any]]:
         elif stage == "e4":
             for dataset in ("synth-route", "founders"):
                 for regime in configs.REGIMES:
-                    for seed in range(5):
+                    for seed in range(3):  # Amendment A2.5
                         for name in ("mc_default", "mc_tuned", "ppo", "grpo", "grpo_nostd"):
                             jobs.append(_job("e4", dataset, regime, seed, name, arms[name], budget_mult=4.0))
         else:
