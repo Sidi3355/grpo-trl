@@ -1,7 +1,7 @@
 [project]
 name = "grpo-trl"
 version = "0.1.0"
-description = "Is GRPO a better policy optimiser than PPO for Think-Reason-Learn's VerifiableRL? A pre-registered study."
+description = "PPO and GRPO against the policy optimiser Think-Reason-Learn ships in VerifiableRL. A pre-registered study."
 requires-python = ">=3.13"
 dependencies = [
     "think-reason-learn[rl] @ git+https://github.com/Vela-Research/think-reason-learn@a71264508d609bbbb15f40b0154bfcaead01aa81",

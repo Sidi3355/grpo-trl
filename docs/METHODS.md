@@ -1,5 +1,9 @@
 # Methods
 
+The aim: test whether a whole-episode policy-gradient optimiser, PPO or GRPO, trains `VerifiableRL`'s policy
+better than the rollout-distillation optimiser Think-Reason-Learn ships, with everything but the optimiser held
+fixed.
+
 The full method, in the order a run executes it. `PLAN.md` is the pre-registration; this file says exactly
 what the code does. Section numbers in brackets point to the code.
 

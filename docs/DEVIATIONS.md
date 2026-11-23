@@ -17,6 +17,7 @@ confirmatory runs are in `PLAN.md` section 13; this file lists them in one place
 | 10 | Before E5 was run (A3) | E5 gained an arm: the patch's own defaults | To check the out-of-the-box behaviour of the proposed change | No |
 | 11 | During E4 (A4) | E7 added: a post hoc arm with a reward-scale normaliser | The first seed of E4 showed mean-centred GRPO collapsing late in training | Registered before the rest of E4 was read; exploratory; it did not cure the collapse |
 | 12 | After E4 and E7 | The recommendation departs from the pre-registered decision rule: PPO, not mean-centred GRPO | The rule looked at one budget; at four the variant it selects is unstable | Against the study's own starting hypothesis |
+| 13 | After all results (A5) | Presentation reframed: the write-up's stated aim is PPO and GRPO against TRL's shipped optimiser, not GRPO against PPO | The code audit showed TRL does not use PPO, and the clearest result is against TRL's optimiser | Registered hypotheses, tests, numbers and verdicts are unchanged. PPO against TRL's optimiser was not a registered test and is labelled descriptive |
 
 ## Things that did not go as the plan expected
 
