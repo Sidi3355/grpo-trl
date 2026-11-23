@@ -3,6 +3,7 @@
 A pre-registered study on `VerifiableRL`, the reinforcement-learning model of Vela Research's
 [Think-Reason-Learn](https://github.com/Vela-Research/think-reason-learn) (TRL).
 22 November 2026. Plan: [`PLAN.md`](PLAN.md). Method in full: [`docs/METHODS.md`](docs/METHODS.md).
+A shorter version in paper format is [`paper/paper.pdf`](paper/paper.pdf); this file is the long form.
 Every number below is read off [`results/summary/TABLES.md`](results/summary/TABLES.md), which one command
 regenerates from the raw run records.
 

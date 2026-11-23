@@ -7,3 +7,10 @@ data/cache/
 data/raw/
 *.egg-info/
 .DS_Store
+
+# LaTeX build files (paper/paper.bbl is kept so the paper builds without BibTeX)
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.blg
+paper/*.toc

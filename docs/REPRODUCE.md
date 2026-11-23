@@ -137,6 +137,27 @@ python -m grpo_trl.report
 writes `results/summary/TABLES.md`, the CSVs beside it and `results/figures/*.png`. Every number in `REPORT.md`
 is read off those files.
 
+## 6. The paper and the page
+
+The paper needs a LaTeX installation (`pdflatex`, `bibtex`) and, for the Word version, `pandoc`:
+
+```bash
+cd paper && pdflatex paper && bibtex paper && pdflatex paper && pdflatex paper
+```
+
+```bash
+cd paper && pandoc paper.tex -o paper.docx --citeproc --bibliography references.bib --resource-path=.
+```
+
+The paper's two figures are copies of `results/figures/fig1_main_results.png` and `fig4_baseline_ladder.png`;
+its numbers are typed from `results/summary/TABLES.md`.
+
+The shareable HTML page is built from `docs/page/` and the results:
+
+```bash
+python -m grpo_trl.page
+```
+
 ## Approximate cost
 
 | Stage | Runs | Wall-clock on 4 cores |

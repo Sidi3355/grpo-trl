@@ -2,7 +2,7 @@
 
     python -m grpo_trl.page
 
-Reads ``docs/report_template.html``, replaces every ``{{name}}`` with a chart or
+Reads ``docs/page/template.html``, replaces every ``{{name}}`` with a chart or
 table built from ``results/``, and writes ``results/report.html``. The prose
 lives in the template; every figure and table is generated here.
 """
@@ -21,7 +21,7 @@ from .analysis import add_normalised, anchor_table, load_curves, load_runs
 from .report import LADDER, LADDER_LABELS, MAIN
 from .run import RESULTS, ROOT
 
-TEMPLATE = ROOT / "docs" / "report_template.html"
+TEMPLATE = ROOT / "docs" / "page" / "template.html"
 OUTPUT = RESULTS / "report.html"
 ARM_ORDER = ["grpo_nostd", "grpo", "ppo", "mc_tuned", "mc_default"]
 
@@ -74,8 +74,8 @@ def curve_series(
 def fragments() -> dict[str, str]:
     parts: dict[str, str] = {
         "chart_css": svg.CSS,
-        "style": (ROOT / "docs" / "report_style.css").read_text(),
-        "robustness": (ROOT / "docs" / "report_robustness.html").read_text(),
+        "style": (ROOT / "docs" / "page" / "style.css").read_text(),
+        "robustness": (ROOT / "docs" / "page" / "robustness.html").read_text(),
     }
     e1 = add_normalised(load_runs("e1"))
     anchors = anchor_table(e1)

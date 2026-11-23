@@ -14,6 +14,7 @@ untouched, tests beside the existing ones, a changelog entry.
 | [`verifiable-rl-group-optimizer.patch`](verifiable-rl-group-optimizer.patch) | The whole change, against `Vela-Research/think-reason-learn` at `a712645` (v0.4.4): 5 files, 437 added lines, 4 changed |
 | [`_group.py`](_group.py) | The new module, for reading without applying the patch |
 | [`PR_DESCRIPTION.md`](PR_DESCRIPTION.md) | The pull-request text, in TRL's template |
+| [`ISSUE.md`](ISSUE.md) | A short note for TRL's maintainers: the two main findings and two questions. Send this first |
 
 ## What it adds
 

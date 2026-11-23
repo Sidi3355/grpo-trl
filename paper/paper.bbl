@@ -1,0 +1,70 @@
+\begin{thebibliography}{9}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Agarwal et~al.(2021)Agarwal, Schwarzer, Castro, Courville, and
+  Bellemare]{agarwal2021precipice}
+Rishabh Agarwal, Max Schwarzer, Pablo~Samuel Castro, Aaron Courville, and
+  Marc~G. Bellemare.
+\newblock Deep reinforcement learning at the edge of the statistical precipice.
+\newblock \emph{arXiv preprint arXiv:2108.13264}, 2021.
+
+\bibitem[de~Oliveira et~al.(2025)de~Oliveira, Frujeri, Queiroz, Martins,
+  Soares, and Melo]{deoliveira2025grpo}
+Bryan L.~M. de~Oliveira, Felipe~V. Frujeri, Marcos P. C.~M. Queiroz, Luana
+  G.~B. Martins, Telma W. de~L. Soares, and Luckeciano~C. Melo.
+\newblock Learning without critics? revisiting {GRPO} in classical
+  reinforcement learning environments.
+\newblock \emph{arXiv preprint arXiv:2511.03527}, 2025.
+
+\bibitem[Janisch et~al.(2017)Janisch, Pevn{\'y}, and
+  Lis{\'y}]{janisch2019costly}
+Jarom{\'i}r Janisch, Tom{\'a}{\v{s}} Pevn{\'y}, and Viliam Lis{\'y}.
+\newblock Classification with costly features using deep reinforcement
+  learning.
+\newblock \emph{arXiv preprint arXiv:1711.07364 (AAAI 2019)}, 2017.
+
+\bibitem[Liu et~al.(2025)Liu, Chen, Li, Qi, Pang, Du, et~al.]{liu2025drgrpo}
+Zichen Liu, Changyu Chen, Wenjun Li, Penghui Qi, Tianyu Pang, Chao Du, et~al.
+\newblock Understanding {R1}-zero-like training: A critical perspective.
+\newblock \emph{arXiv preprint arXiv:2503.20783}, 2025.
+
+\bibitem[Schulman et~al.(2015)Schulman, Moritz, Levine, Jordan, and
+  Abbeel]{schulman2015gae}
+John Schulman, Philipp Moritz, Sergey Levine, Michael Jordan, and Pieter
+  Abbeel.
+\newblock High-dimensional continuous control using generalized advantage
+  estimation.
+\newblock \emph{arXiv preprint arXiv:1506.02438}, 2015.
+
+\bibitem[Schulman et~al.(2017)Schulman, Wolski, Dhariwal, Radford, and
+  Klimov]{schulman2017ppo}
+John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov.
+\newblock Proximal policy optimization algorithms.
+\newblock \emph{arXiv preprint arXiv:1707.06347}, 2017.
+
+\bibitem[Shao et~al.(2024)Shao, Wang, Zhu, Xu, Song, Bi, Zhang, Zhang, Li, Wu,
+  and Guo]{shao2024deepseekmath}
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei
+  Zhang, Mingchuan Zhang, Y.~K. Li, Y.~Wu, and Daya Guo.
+\newblock {DeepSeekMath}: Pushing the limits of mathematical reasoning in open
+  language models.
+\newblock \emph{arXiv preprint arXiv:2402.03300}, 2024.
+
+\bibitem[{Vela Research}(2026)]{trl2026}
+{Vela Research}.
+\newblock Think-reason-learn.
+\newblock \url{https://github.com/Vela-Research/think-reason-learn}, 2026.
+\newblock Version 0.4.4, commit \texttt{a712645}.
+
+\bibitem[Ye et~al.(2026)Ye, Alican, Griffin, Yin, and Ihlamur]{ye2026learning}
+Y.~Ye, F.~Alican, B.~Griffin, A.~O. Yin, and Y.~Ihlamur.
+\newblock Learning what to ask: Cost-aware sequential founder evaluation.
+\newblock MIDAS workshop, ECML-PKDD 2026, 2026.
+\newblock The paper could not be retrieved for this study; the method was
+  audited from its implementation in Think-Reason-Learn.
+
+\end{thebibliography}
