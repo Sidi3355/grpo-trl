@@ -4,6 +4,11 @@
 pre-registration record. Later changes are appended as dated amendments in section 13; nothing above that
 section is rewritten after the confirmatory runs start.
 
+**Reading note (added 2026-11-23, Amendment A5).** This plan was registered around the question in its title.
+The finished study is presented around a wider one, which the audit in section 1 already pointed to: do PPO and
+GRPO train `VerifiableRL`'s policy better than the optimiser TRL ships? The text below is left as it was
+registered. Hypotheses, tests and the decision rule are unchanged, and are reported as written here.
+
 **Naming.** "TRL" here always means Vela Research's *Think-Reason-Learn* library
 (`Vela-Research/think-reason-learn`), not Hugging Face's *Transformer Reinforcement Learning* library
 (which also ships a `GRPOTrainer`). The two are unrelated.
@@ -480,3 +485,15 @@ budgets it helped a little (0.95 to 1.12, +0.16 [-0.06, +0.43]) and did not cure
 ended more than 0.3 below their best, against 8 of 12 without it and 2 of 12 for PPO. The hypothesis explains at
 most part of the instability. The proposed patch was therefore left as the variant the end-to-end experiment ran,
 with the limitation written into its documentation, and the report's recommendation was changed to PPO.
+
+### A5 (2026-11-23, after all results: a change of presentation only)
+
+The write-up (`README.md`, `REPORT.md`, the shareable page, the package description) is reframed. Its stated aim
+is now the comparison this plan's section 1 called "the question that decides whether TRL should change": PPO
+and GRPO, as two challengers, against the optimiser TRL ships. The original question (GRPO against PPO) is
+reported as the comparison between the two challengers and as the place the study started.
+
+- No number, table, figure, test or verdict changed. H1 to H4 and H1' to H2b' are reported as registered.
+- **PPO against TRL's optimiser was never a registered test,** and reframing does not make it one. It is the
+  study's clearest result and is labelled descriptive, with unadjusted intervals, wherever it appears.
+- The body of this plan above section 13 is not rewritten; a reading note at the top points here.
